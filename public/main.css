@@ -1,39 +1,110 @@
 body{
-	background:#767a83;
+	background:#c1c8d7;
 	/*margin-top:50px;*/
 	font: 15px "Trebuchet MS";
 	color:#c0c0c0;
-
 }
 
-
-#map_div{
-    width:45%;
-    height:50vh;
+#main_div{
+    width: 100%;
+    height: 70vh;
     /*border:1px solid red;*/
     /*margin-right:10px;*/
-    float:left;
+    float: left;
 }
 
-#text_div{
-    width:55%;
-    height:50vh;
-    /*border:1px solid red;*/
-    font-size: calc(2vw + 2vh);
-    float:left;
+#main_upper_div{
+  box-sizing: border-box;
+  width: 100%;
+  height: 10vh;
 }
-#barchart_div{
-  width:100%;
-  height:20vh;
+
+#title_div{
+  width: 50%;
+  height: 10vh;
+  /*border:1px solid red;*/
+  /*margin-right:10px;*/
+  float: left;
+}
+
+#us_map_options_div{
+  width: 50%;
+  height: 10vh;
+  /*border:1px solid red;*/
+  /*margin-right:10px;*/
+  float: left;
+}
+
+#main_lower_div{
+  box-sizing: border-box;
+  width: 100%;
+  height: 50vh;
+}
+
+#us_map_div{
+  width: 80%;
+  height: 50vh;
+  /*border:1px solid red;*/
+  /*margin-right:10px;*/
+  float: left;
+}
+
+#us_map_stats_div{
+  width: 20%;
+  height: 50vh;
+  /*border:1px solid red;*/
+  /*margin-right:10px;*/
+  float: left;
+}
+
+#zoom_div{
+  width: 100%;
+  height: 80vh;
   /*border:1px solid red;*/
   font-size: calc(2vw + 2vh);
-  float:left;
+  float: left;
 }
-#heatmap_div{
-  width:100%;
-  height:27vh;
-  /*border:1px solid red;*/
-  float:left;
+
+.state{
+  width: 45%;
+  height: 80vh;
+  float: left;
+}
+
+.state_upper{
+  width: 100%;
+  height: 10vh;
+  float: left;
+}
+
+.state_drop_menu{
+  width: 40%;
+  height: 10vh;
+  float: left;
+}
+
+.state_drop_stats{
+  width: 50%;
+  height: 10vh;
+  float: left;
+}
+
+.state_map{
+  width: 100%;
+  height: 40vh;
+  float: left;
+}
+
+.state_pie_chart{
+  width: 100%;
+  height: 30vh;
+  float: left;
+}
+
+#states_attributes_menu_div{
+  width: 10%;
+  height: 80vh;
+  float: left;
 }
 
 .headline, .subline{
@@ -42,13 +113,14 @@ body{
   margin-bottom: 0.67em;
   margin-left: 0;
   margin-right: 0;
-  fill: white;
+  fill: rgb(0, 0, 0);
   font-family: 'PT Sans',sans-serif;
   opacity: 0.5;
 }
 
 .headline{
   font-weight: bold;
+  font-size: 150%;
 }
 
 .subline{

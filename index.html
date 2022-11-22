@@ -2,21 +2,46 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Project US police shootings</title>
-    <script type="text/javascript" src="https://d3js.org/d3.v4.min.js"></script>
-    <script src="https://d3js.org/d3-selection-multi.v1.min.js"></script> 
+    <title>US police shootings</title>
     <link href="./public/main.css" rel="stylesheet">
-    <script type="text/javascript" src="public/myD3app.js"></script>
   </head>
   <body>
 
-  <!-- TODO: DEFINE NEW DIVS //-->
+    <div id="main_div">
+      <div id="main_upper_div">
+        <div id="title_div"></div>
+        <div id="us_map_options_div"></div>
+      </div>
+      <div id="main_lower_div">
+        <div id="us_map_div"></div>
+        <div id="us_map_stats_div"></div>
+      </div>
+    </div>
 
-	<div id="map_div"></div>
-	<div id="text_div"></div>
-	<div id="barchart_div"></div>
-	<div id="heatmap_div"></div>
+    <div id="zoom_div">
 
-  <!-- END TODO //-->
+      <div id="state1_div" class="state">
+        <div id="state1_upper" class="state_upper">
+          <div id="state1_drop_menu_div" class="state_drop_menu"></div>
+          <div id="state1_stats_div" class="state_stats"></div>  
+        </div>
+        <div id="state1_map_div" class="state_map"></div>
+        <div id="state1_pie_chart_div" class="state_pie_chart"></div>
+      </div>
 
+      <div id="states_attributes_menu_div"></div>
+
+      <div id="state2_div" class="state">
+        <div id="state2_upper" class="state_upper">
+          <div id="state2_drop_menu_div" class="state_drop_menu"></div>
+          <div id="state2_stats_div" class="state_stats"></div>  
+        </div>
+        <div id="state2_map_div" class="state_map"></div>
+        <div id="state2_pie_chart_div" class="state_pie_chart"></div>
+      </div>
+    </div>
+
+    <script type="text/javascript" src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-selection-multi.v1.min.js"></script> 
+    <script type="text/javascript" src="public/myD3app.js"></script>
   </body>
