@@ -1,5 +1,6 @@
 //variable containing reference to data
-var data;
+var data_shootings;
+var data_state_name_mappings;
 
 //D3.js canvases
 var mainArea;
@@ -21,51 +22,58 @@ var statesAttributesMenuArea;
 
 //D3.js svg elements
 //TODO
-var selectedAreaText;
+//var selectedAreaText;
 
 //variables for selection
-var selectedState;
-var previousSelectedState;
+var selectedStateMainMap;
+var previousSelectedStateMainMap;
 
-//variables for precomputed values
+// other global variables for precomputed values
 //TODO
+var myColorScale;
+var topAbsoluteValue;
 
-/*Loading data from CSV file and editing the properties to province codes. Unary operator plus is used to save the data as numbers (originally imported as string)*/
-// TODO: load data
-/*
-d3.csv("./public/criminality.csv")
-  .row(function (d) {
+/* Loading the main data from CSV file */
+d3.csv("./public/us_police_shootings_dataset.csv")
+  .row(function (d_shootings) {
     return {
-      date: d["Time Unit"],
-      Czech_Republic: +d["Average"],
-      Central_Bohemia_Region: +d["Central Bohemia Region"],
-      South_Bohemian_Region: +d["South Bohemian Region"],
-      Pilsen_Region: +d["The Pilsen Region"],
-      Usti_Region: +d["The Ústí Region"],
-      Hradec_Kralove_Region: +d["Hradec Králové Region"],
-      Southern_Moravia_Region: +d["Southern Moravia Region"],
-      Moravia_Silesia_Region: +d["Moravian- Silesian Region"],
-      Olomouc_Region: +d["The Olomouc Region"],
-      Zlin_Region: +d["Zlín Region"],
-      Vysocina_Region: +d["Vysočina Region"],
-      Pardubice_Region: +d["The Pardubice Region"],
-      Liberec_Region: +d["Liberec Region"],
-      Karlovy_Vary_Region: +d["Karlovy Vary Region"],
-      City_of_Prague: +d["City of Prague"]
+      id: +d["id"],
+      name: d["name"],
+      date: d["date"],
+      manner_of_death: d["manner_of_death"],
+      armed_with: d["armed"],
+      age: +d["age"],
+      gender: d["gender"],
+      race: d["race"],
+      city: d["city"],
+      state: d["state"],
+      signs_of_mental_illness: d["signs_of_mental_illness"],
+      threat_level: d["threat_level"],
+      flee: d["flee"],
+      body_camera: d["body_camera"],
+      longitude: d["longitude"],
+      latitude: d["latitude"],
+      is_geocoding_exact: d["is_geocoding_exact"],
     };
   }).get(function (error, rows) {
-    //saving reference to data
-    data = rows;
+    // saving reference to data
+    data_shootings = rows;
 
-    //load map and initialise the views
-    init();
+    /* Loading the <state code - state> mapping data from JSON file */
+    d3.json("./public/states_dict.json", function (error, d_states) {
+      // saving reference to data
+      data_state_name_mappings = d_states;
+      console.log(data_state_name_mappings);
 
-    // data visualization
-    visualization();
-  });
-*/
-init();
-visualization();
+      //load map and initialise the views
+      init();
+
+      // data visualization
+      visualization();
+    });  
+});
+
+
 
 /*----------------------
 INITIALIZE VISUALIZATION
@@ -107,44 +115,20 @@ function init() {
     });
 
   
-  
-  console.log(d3.select("#title_div").node().clientHeight);
-  //TODO: d3 canvases for svg elements
+  // TODO: d3 canvases for svg elements
   titleArea = d3.select("#title_div").append("svg")
     .attr("width", d3.select("#title_div").node().clientWidth)
     .attr("height", d3.select("#title_div").node().clientHeight);
-  /*
-  textArea = d3.select("#text_div").append("svg")
-    .attr("width", d3.select("#text_div").node().clientWidth)
-    .attr("height", d3.select("#text_div").node().clientHeight);
-
-  barChartArea = d3.select("#barchart_div").append("svg")
-    .attr("width", d3.select("#barchart_div").node().clientWidth)
-    .attr("height", d3.select("#barchart_div").node().clientHeight);
-
-  heatMap = d3.select("#heatmap_div").append("svg")
-    .attr("width", d3.select("#heatmap_div").node().clientWidth)
-    .attr("height", d3.select("#heatmap_div").node().clientHeight);
-  */
-
-  // TODO: precomputation of top value in all the data and similar things
-  /*
-  topValue = 0
-  for (let index = 0; index < data.length; index++) {
-    for (var key in data[index]) {
-      if (key != 'date') {
-        if (topValue < data[index][key]) topValue = data[index][key]
-      }
-    }
-  }
-  console.log("Top overall value is " + topValue)
-
-  //gap size for heatmap row labels
-  labelWidth = (1 / 8) * heatMap.node().clientWidth
-
-  //width of one bar/column of the heatmap
-  barWidth = ((7 / 8) * heatMap.node().clientWidth) / data.length
-  */
+  
+  usMapStatsArea = d3.select("#us_map_stats_div").append("svg")
+    .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
+    .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
+  
+    // TODO: compute values for states
+  topAbsoluteValue = 1000;
+  
+  // initialize color scale
+  myColorScale = d3.scaleSequential().domain([0, topAbsoluteValue]).interpolator(d3.interpolatePlasma);
 }
 
 
@@ -162,8 +146,49 @@ TEXT INFORMATION
 function drawTextInfo() {
   //Draw headline
   titleArea.append("text")
-    .attrs({ dx: 20, dy: "3em", class: "headline" })
+    .attrs({ dx: 100, dy: "2em", class: "headline" })
     .text("Police Shootings in the US");
+
+  
+  //set up a gradient variable for linear gradient
+  //this is a storage elemnt that is appended as separate xml tag to svg, but does not result any "graphical output"
+  var gradient = usMapStatsArea.append("linearGradient")
+    .attr("id", "svgGradient")
+    .attr("x1", "0%")
+    .attr("x2", "100%")
+
+  //append gradient "stops" - control points at varius gardient offsets with specific colors
+  //you can set up multiple stops, minumum are 2
+  gradient.append("stop")
+    .attr('offset', "0%") //starting color
+    .attr("stop-color", myColorScale(0));
+
+  gradient.append("stop")
+    .attr('offset', "50%") //middle color
+    .attr("stop-color",  myColorScale(topAbsoluteValue/2));
+    
+  gradient.append("stop")
+    .attr('offset', "100%") //end color
+    .attr("stop-color",  myColorScale(topAbsoluteValue));
+
+  //append rectangle with gradient fill  
+  usMapStatsArea.append('rect').attrs({ x: 5, 
+            y: usMapStatsArea.node().clientHeight - 30, 
+            width: usMapStatsArea.node().clientWidth / 2, 
+            height: 18, 
+            stroke: 'white',
+            fill: 'url(#svgGradient)'}) //gradient color fill is set as url to svg gradient element
+          .style("stroke-width", 3)
+
+  //min and max labels         
+  usMapStatsArea.append("text")
+    .attrs({x: 5, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
+    .text("min");
+  usMapStatsArea.append("text")
+    .attrs({x: usMapStatsArea.node().clientWidth / 2, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
+    .attr("text-anchor", "end")
+    .text("max");
+
 
   // TODO
   /*
@@ -184,24 +209,18 @@ function drawTextInfo() {
 /*----------------------
 INTERACTION
 ----------------------*/
-function mapClick(region) {
-  console.log(region)
+function mapClick(stateId) {
   // TODO
+  previousSelectedStateMainMap = selectedStateMainMap
+  selectedStateMainMap = stateId
 
-  /*
-  previousSelectedRegion = selectedRegion
-
-  if (previousSelectedRegion == region) {
-    d3.select('#'+selectedRegion).style("fill", 'lightgray').raise()
-    selectedRegion = "Czech_Republic"
-    selectedAreaText.text("Selected region: Czech Republic")
+  if (selectedStateMainMap == previousSelectedStateMainMap) {
+    d3.select('#'+selectedStateMainMap).style("fill", 'lightgray').raise()
+    selectedStateMainMap = "USA"
   }
   else {
-    selectedAreaText.text("Selected region: " + region.replace(/_/g, ' '))
-    selectedRegion = region  
-    d3.select('#'+selectedRegion).style("fill", 'white').raise()
-    d3.select('#'+previousSelectedRegion).style("fill", 'lightgrey')
+    d3.select('#'+selectedStateMainMap).style("fill", 'white').raise()
+    d3.select('#'+previousSelectedStateMainMap).style("fill", 'lightgrey')
   }
-  drawBarChart(selectedRegion)
-  */
+  console.log("Selected:", selectedStateMainMap)
 }
