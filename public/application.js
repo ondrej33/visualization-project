@@ -116,7 +116,7 @@ function init() {
     });
 
   
-  // TODO: d3 canvases for svg elements
+  // d3 canvases for svg elements
   titleArea = d3.select("#title_div").append("svg")
     .attr("width", d3.select("#title_div").node().clientWidth)
     .attr("height", d3.select("#title_div").node().clientHeight);
@@ -125,6 +125,10 @@ function init() {
     .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
     .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
   
+  usMapStatsArea = d3.select("#us_map_options_div").append("svg")
+    .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
+    .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
+
   // divide data by states
   divideDataToStates()
 
@@ -136,7 +140,7 @@ function init() {
 }
 
 function divideDataToStates() {
-    // initiate the map with state codes and empty lists
+  // initiate the map with state codes and empty lists
   dataShootingsByStates = new Map()
   for (var key in dataStateNameMappings) {
     dataShootingsByStates[key] = []
@@ -166,6 +170,7 @@ BEGINNING OF VISUALIZATION
 function visualization() {
   drawTitle();
   drawUsMapStats();
+  drawUsMapOptions();
 }
 
 /*----------------------
@@ -174,7 +179,17 @@ TITLE
 function drawTitle() {
   //Draw headline
   titleArea.append("text")
-    .attrs({ dx: 100, dy: "2em", class: "headline" })
+    .attrs({ dx: 200, dy: "2em", class: "headline" })
+    .text("Police Shootings in the US");
+}
+
+/*----------------------
+TITLE
+----------------------*/
+function drawUsMapOptions() {
+  //Draw headline
+  titleArea.append("text")
+    .attrs({ dx: 200, dy: "2em", class: "headline" })
     .text("Police Shootings in the US");
 }
 
@@ -204,7 +219,7 @@ function drawUsMapStats() {
     .attr("stop-color",  myColorScale(highestAbsoluteValue));
 
   //append rectangle with gradient fill  
-  usMapStatsArea.append('rect').attrs({ x: 5, 
+  usMapStatsArea.append('rect').attrs({ x: 0, 
             y: usMapStatsArea.node().clientHeight - 30, 
             width: usMapStatsArea.node().clientWidth * 0.8, 
             height: 18, 
@@ -214,7 +229,7 @@ function drawUsMapStats() {
 
   //min and max labels         
   usMapStatsArea.append("text")
-    .attrs({x: 5, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
+    .attrs({x: 0, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
     .text("min");
   usMapStatsArea.append("text")
     .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
@@ -241,7 +256,6 @@ function colorMap() {
     d3.select('#'+key).style("fill", color).raise()
   }
 }
-
 
 /*----------------------
 INTERACTION WITH THE MAIN MAP
