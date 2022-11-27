@@ -1,6 +1,7 @@
 //variable containing reference to data
-var data_shootings;
-var data_state_name_mappings;
+var dataShootings;
+var dataShootingsByStates;
+var dataStateNameMappings;
 
 //D3.js canvases
 var mainArea;
@@ -30,12 +31,13 @@ var previousSelectedStateMainMap;
 
 // other global variables for precomputed values
 //TODO
+var numStates = 51;
 var myColorScale;
-var topAbsoluteValue;
+var highestAbsoluteValue;
 
 /* Loading the main data from CSV file */
 d3.csv("./public/us_police_shootings_dataset.csv")
-  .row(function (d_shootings) {
+  .row(function (d) {
     return {
       id: +d["id"],
       name: d["name"],
@@ -46,7 +48,7 @@ d3.csv("./public/us_police_shootings_dataset.csv")
       gender: d["gender"],
       race: d["race"],
       city: d["city"],
-      state: d["state"],
+      state_code: d["state"],
       signs_of_mental_illness: d["signs_of_mental_illness"],
       threat_level: d["threat_level"],
       flee: d["flee"],
@@ -57,14 +59,13 @@ d3.csv("./public/us_police_shootings_dataset.csv")
     };
   }).get(function (error, rows) {
     // saving reference to data
-    data_shootings = rows;
+    dataShootings = rows;
 
     /* Loading the <state code - state> mapping data from JSON file */
     d3.json("./public/states_dict.json", function (error, d_states) {
-      // saving reference to data
-      data_state_name_mappings = d_states;
-      console.log(data_state_name_mappings);
-
+      // saving reference to data regarding mapping of state names
+      dataStateNameMappings = d_states;
+    
       //load map and initialise the views
       init();
 
@@ -83,9 +84,9 @@ function init() {
   let width = screen.width;
   let height = screen.height;
 
-  // TODO: init selections
-  // selectedRegion = 'Czech_Republic'
-  // previousSelectedRegion = 'Czech_Republic'
+  // initial selections for the main map
+  selectedStateMainMap = "USA"
+  previousSelectedStateMainMap = "USA"
 
   //retrieve an SVG file via d3.request, 
   //the xhr.responseXML property is a document instance
@@ -110,7 +111,7 @@ function init() {
         .style("stroke", "gray")
         .style("stroke-width", 3)
         .on("click", function () {
-          mapClick(this.id);
+          mainMapClick(this.id);
         });
     });
 
@@ -124,11 +125,38 @@ function init() {
     .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
     .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
   
-    // TODO: compute values for states
-  topAbsoluteValue = 1000;
+  // divide data by states
+  divideDataToStates()
+
+  // compute the highest number of shooting in a state
+  highestAbsoluteValue = computeHighestAbsoluteValue();
   
   // initialize color scale
-  myColorScale = d3.scaleSequential().domain([0, topAbsoluteValue]).interpolator(d3.interpolatePlasma);
+  myColorScale = d3.scaleSequential().domain([0, highestAbsoluteValue]).interpolator(d3.interpolatePlasma);
+}
+
+function divideDataToStates() {
+    // initiate the map with state codes and empty lists
+  dataShootingsByStates = new Map()
+  for (var key in dataStateNameMappings) {
+    dataShootingsByStates[key] = []
+  }
+
+  // divide cases into the lists by their state
+  for (shootingCase of dataShootings) {
+    var state_code = shootingCase["state_code"]
+    dataShootingsByStates[state_code].push(shootingCase)
+  }
+}
+
+function computeHighestAbsoluteValue() {
+  topValue = 0
+  for (var key in dataShootingsByStates) {
+    if (dataShootingsByStates[key].length > topValue) {
+      topValue = dataShootingsByStates[key].length
+    }
+  }
+  return topValue;
 }
 
 
@@ -136,20 +164,24 @@ function init() {
 BEGINNING OF VISUALIZATION
 ----------------------*/
 function visualization() {
-
-  drawTextInfo();
+  drawTitle();
+  drawUsMapStats();
 }
 
 /*----------------------
-TEXT INFORMATION
+TITLE
 ----------------------*/
-function drawTextInfo() {
+function drawTitle() {
   //Draw headline
   titleArea.append("text")
     .attrs({ dx: 100, dy: "2em", class: "headline" })
     .text("Police Shootings in the US");
+}
 
-  
+/*----------------------
+STATS AND LEGEND FOR THE MAIN MAP
+----------------------*/
+function drawUsMapStats() {
   //set up a gradient variable for linear gradient
   //this is a storage elemnt that is appended as separate xml tag to svg, but does not result any "graphical output"
   var gradient = usMapStatsArea.append("linearGradient")
@@ -165,16 +197,16 @@ function drawTextInfo() {
 
   gradient.append("stop")
     .attr('offset', "50%") //middle color
-    .attr("stop-color",  myColorScale(topAbsoluteValue/2));
+    .attr("stop-color",  myColorScale(highestAbsoluteValue / 2));
     
   gradient.append("stop")
     .attr('offset', "100%") //end color
-    .attr("stop-color",  myColorScale(topAbsoluteValue));
+    .attr("stop-color",  myColorScale(highestAbsoluteValue));
 
   //append rectangle with gradient fill  
   usMapStatsArea.append('rect').attrs({ x: 5, 
             y: usMapStatsArea.node().clientHeight - 30, 
-            width: usMapStatsArea.node().clientWidth / 2, 
+            width: usMapStatsArea.node().clientWidth * 0.8, 
             height: 18, 
             stroke: 'white',
             fill: 'url(#svgGradient)'}) //gradient color fill is set as url to svg gradient element
@@ -185,10 +217,9 @@ function drawTextInfo() {
     .attrs({x: 5, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
     .text("min");
   usMapStatsArea.append("text")
-    .attrs({x: usMapStatsArea.node().clientWidth / 2, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
+    .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
     .attr("text-anchor", "end")
     .text("max");
-
 
   // TODO
   /*
@@ -197,30 +228,45 @@ function drawTextInfo() {
     .attrs({ dx: 20, dy: "7.5em", class: "subline" })
     .text("Data source: mapakriminality.cz")
     .on("click", function () { window.open("https://www.mapakriminality.cz/data/"); });;
-
-  //Draw selection information
-  selectedAreaText = textArea.append("text")
-    .attrs({ dx: 20, dy: "10em", class: "subline" })
-    .text("Selected Region: " + selectedRegion.replace(/_/g, " "));
   */
+}
+
+/*----------------------
+COLOR THE MAIN MAP
+----------------------*/
+function colorMap() {
+  //set the state color corresponding to the number of cases
+  for (var key in dataStateNameMappings) {
+    var color = myColorScale(dataShootingsByStates[key].length)
+    d3.select('#'+key).style("fill", color).raise()
+  }
 }
 
 
 /*----------------------
-INTERACTION
+INTERACTION WITH THE MAIN MAP
 ----------------------*/
-function mapClick(stateId) {
+function mainMapClick(stateId) {
+  // TODO: move color map somewhere else
+  colorMap()
+
   // TODO
   previousSelectedStateMainMap = selectedStateMainMap
   selectedStateMainMap = stateId
+  console.log(d3.select('#'+stateId))
 
   if (selectedStateMainMap == previousSelectedStateMainMap) {
-    d3.select('#'+selectedStateMainMap).style("fill", 'lightgray').raise()
+    var origColor = myColorScale(dataShootingsByStates[selectedStateMainMap].length)
+    d3.select('#'+selectedStateMainMap).style("fill", origColor).raise()
     selectedStateMainMap = "USA"
-  }
-  else {
+    console.log("Unselected")
+  } else {
+    // if some state was selected before, color it back
+    if (previousSelectedStateMainMap != "USA") {
+      var origColor = myColorScale(dataShootingsByStates[previousSelectedStateMainMap].length)
+      d3.select('#'+previousSelectedStateMainMap).style("fill", origColor).raise()  
+    }
     d3.select('#'+selectedStateMainMap).style("fill", 'white').raise()
-    d3.select('#'+previousSelectedStateMainMap).style("fill", 'lightgrey')
+    console.log("Selected:", dataStateNameMappings[selectedStateMainMap])
   }
-  console.log("Selected:", selectedStateMainMap)
 }
