@@ -153,7 +153,6 @@ function divideDataToStates(year = null, month = null) {
     if ((year == null || year == shootingCase["date"].getFullYear()) &&
         (month == null || month == shootingCase["date"].getMonth() + 1)) {
       dataShootingsByStates[state_code].push(shootingCase)
-      console.log(shootingCase["date"])
     }
   }
 }
@@ -288,3 +287,19 @@ function mainMapClick(stateId) {
     console.log("Selected:", dataStateNameMappings[selectedStateMainMap])
   }
 }
+
+/*----------------------
+INTERACTION WITH THE BUTTONS
+----------------------*/
+
+$("#select_month_btn").on("click", function(event){
+  console.log("You clicked the month drop down", event)
+})
+
+$("#select_year_btn").on("click", function(event){
+  console.log("You clicked the year drop down", event)
+})
+
+$(".dropdown-menu").on("click", function(event){
+  console.log("You clicked drop down menu", event)
+})
