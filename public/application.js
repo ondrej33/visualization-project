@@ -41,7 +41,7 @@ d3.csv("./public/us_police_shootings_dataset.csv")
     return {
       id: +d["id"],
       name: d["name"],
-      date: d["date"],
+      date: new Date(d["date"]),
       manner_of_death: d["manner_of_death"],
       armed_with: d["armed"],
       age: +d["age"],
@@ -139,7 +139,7 @@ function init() {
   myColorScale = d3.scaleSequential().domain([0, highestAbsoluteValue]).interpolator(d3.interpolatePlasma);
 }
 
-function divideDataToStates() {
+function divideDataToStates(year = null, month = null) {
   // initiate the map with state codes and empty lists
   dataShootingsByStates = new Map()
   for (var key in dataStateNameMappings) {
@@ -149,7 +149,12 @@ function divideDataToStates() {
   // divide cases into the lists by their state
   for (shootingCase of dataShootings) {
     var state_code = shootingCase["state_code"]
-    dataShootingsByStates[state_code].push(shootingCase)
+    // if year or month is not specified, take all, otherwise filter
+    if ((year == null || year == shootingCase["date"].getFullYear()) &&
+        (month == null || month == shootingCase["date"].getMonth() + 1)) {
+      dataShootingsByStates[state_code].push(shootingCase)
+      console.log(shootingCase["date"])
+    }
   }
 }
 
@@ -267,7 +272,6 @@ function mainMapClick(stateId) {
   // TODO
   previousSelectedStateMainMap = selectedStateMainMap
   selectedStateMainMap = stateId
-  console.log(d3.select('#'+stateId))
 
   if (selectedStateMainMap == previousSelectedStateMainMap) {
     var origColor = myColorScale(dataShootingsByStates[selectedStateMainMap].length)
