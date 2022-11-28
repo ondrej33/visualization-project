@@ -29,6 +29,13 @@ var statesAttributesMenuArea;
 var selectedStateMainMap;
 var previousSelectedStateMainMap;
 
+var selectedYear;
+var selectedYearButton;
+var selectedMonth;
+var selectedMonthButton;
+
+var selectedMode;
+
 // other global variables for precomputed values
 //TODO
 var numStates = 51;
@@ -85,8 +92,14 @@ function init() {
   let height = screen.height;
 
   // initial selections for the main map
-  selectedStateMainMap = "USA"
-  previousSelectedStateMainMap = "USA"
+  selectedStateMainMap = "USA";
+  previousSelectedStateMainMap = "USA";
+
+  // initial time selections
+  selectedYear = null;
+  selectedMonth = null;
+  selectedYearButton = null;
+  selectedMonthButton = null;
 
   //retrieve an SVG file via d3.request, 
   //the xhr.responseXML property is a document instance
@@ -128,40 +141,49 @@ function init() {
   usMapStatsArea = d3.select("#us_map_options_div").append("svg")
     .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
     .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
+  
+  precompute_data()
 
+  // Title stays always the same
+  drawTitle();
+}
+
+// Precompute data division, and color scheme 
+// Important to do this before any modifications of the map
+function precompute_data() {
   // divide data by states
-  divideDataToStates()
+  divideDataToStates(selectedYear, selectedMonth);
 
   // compute the highest number of shooting in a state
   highestAbsoluteValue = computeHighestAbsoluteValue();
-  
+    
   // initialize color scale
   myColorScale = d3.scaleSequential().domain([0, highestAbsoluteValue]).interpolator(d3.interpolatePlasma);
 }
 
-function divideDataToStates(year = null, month = null) {
+function divideDataToStates(year, month) {
   // initiate the map with state codes and empty lists
-  dataShootingsByStates = new Map()
+  dataShootingsByStates = new Map();
   for (var key in dataStateNameMappings) {
-    dataShootingsByStates[key] = []
+    dataShootingsByStates[key] = [];
   }
 
   // divide cases into the lists by their state
   for (shootingCase of dataShootings) {
-    var state_code = shootingCase["state_code"]
+    var state_code = shootingCase["state_code"];
     // if year or month is not specified, take all, otherwise filter
     if ((year == null || year == shootingCase["date"].getFullYear()) &&
         (month == null || month == shootingCase["date"].getMonth() + 1)) {
-      dataShootingsByStates[state_code].push(shootingCase)
+      dataShootingsByStates[state_code].push(shootingCase);
     }
   }
 }
 
 function computeHighestAbsoluteValue() {
-  topValue = 0
+  topValue = 0;
   for (var key in dataShootingsByStates) {
     if (dataShootingsByStates[key].length > topValue) {
-      topValue = dataShootingsByStates[key].length
+      topValue = dataShootingsByStates[key].length;
     }
   }
   return topValue;
@@ -172,9 +194,9 @@ function computeHighestAbsoluteValue() {
 BEGINNING OF VISUALIZATION
 ----------------------*/
 function visualization() {
-  drawTitle();
   drawUsMapStats();
   drawUsMapOptions();
+  colorMap();
 }
 
 /*----------------------
@@ -188,7 +210,7 @@ function drawTitle() {
 }
 
 /*----------------------
-TITLE
+MAP OPTIONS (buttons, dropdowns)
 ----------------------*/
 function drawUsMapOptions() {
   //Draw headline
@@ -206,7 +228,7 @@ function drawUsMapStats() {
   var gradient = usMapStatsArea.append("linearGradient")
     .attr("id", "svgGradient")
     .attr("x1", "0%")
-    .attr("x2", "100%")
+    .attr("x2", "100%");
 
   //append gradient "stops" - control points at varius gardient offsets with specific colors
   //you can set up multiple stops, minumum are 2
@@ -229,7 +251,7 @@ function drawUsMapStats() {
             height: 18, 
             stroke: 'white',
             fill: 'url(#svgGradient)'}) //gradient color fill is set as url to svg gradient element
-          .style("stroke-width", 3)
+          .style("stroke-width", 3);
 
   //min and max labels         
   usMapStatsArea.append("text")
@@ -239,15 +261,6 @@ function drawUsMapStats() {
     .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
     .attr("text-anchor", "end")
     .text("max");
-
-  // TODO
-  /*
-  //Draw source
-  textArea.append("text")
-    .attrs({ dx: 20, dy: "7.5em", class: "subline" })
-    .text("Data source: mapakriminality.cz")
-    .on("click", function () { window.open("https://www.mapakriminality.cz/data/"); });;
-  */
 }
 
 /*----------------------
@@ -256,8 +269,8 @@ COLOR THE MAIN MAP
 function colorMap() {
   //set the state color corresponding to the number of cases
   for (var key in dataStateNameMappings) {
-    var color = myColorScale(dataShootingsByStates[key].length)
-    d3.select('#'+key).style("fill", color).raise()
+    var color = myColorScale(dataShootingsByStates[key].length);
+    d3.select('#'+key).style("fill", color).raise();
   }
 }
 
@@ -266,40 +279,107 @@ INTERACTION WITH THE MAIN MAP
 ----------------------*/
 function mainMapClick(stateId) {
   // TODO: move color map somewhere else
-  colorMap()
+  colorMap();
 
   // TODO
-  previousSelectedStateMainMap = selectedStateMainMap
-  selectedStateMainMap = stateId
+  previousSelectedStateMainMap = selectedStateMainMap;
+  selectedStateMainMap = stateId;
 
   if (selectedStateMainMap == previousSelectedStateMainMap) {
-    var origColor = myColorScale(dataShootingsByStates[selectedStateMainMap].length)
-    d3.select('#'+selectedStateMainMap).style("fill", origColor).raise()
-    selectedStateMainMap = "USA"
-    console.log("Unselected")
+    var origColor = myColorScale(dataShootingsByStates[selectedStateMainMap].length);
+    d3.select('#'+selectedStateMainMap).style("fill", origColor).raise();
+    selectedStateMainMap = "USA";
+    console.log("Unselected");
   } else {
     // if some state was selected before, color it back
     if (previousSelectedStateMainMap != "USA") {
-      var origColor = myColorScale(dataShootingsByStates[previousSelectedStateMainMap].length)
-      d3.select('#'+previousSelectedStateMainMap).style("fill", origColor).raise()  
+      var origColor = myColorScale(dataShootingsByStates[previousSelectedStateMainMap].length);
+      d3.select('#'+previousSelectedStateMainMap).style("fill", origColor).raise();
     }
-    d3.select('#'+selectedStateMainMap).style("fill", 'white').raise()
-    console.log("Selected:", dataStateNameMappings[selectedStateMainMap])
+    d3.select('#'+selectedStateMainMap).style("fill", 'white').raise();
+    console.log("Selected:", dataStateNameMappings[selectedStateMainMap]);
   }
 }
 
 /*----------------------
-INTERACTION WITH THE BUTTONS
+INTERACTION WITH THE BUTTONS AND DROPDOWNS
 ----------------------*/
 
+// Month changing
 $("#select_month_btn").on("click", function(event){
-  console.log("You clicked the month drop down", event)
-})
+  console.log("You clicked the month drop down", event);
+});
 
+$(".month-item").on("click", function(event){
+  var target = event.target;
+  if ( $(target).hasClass("active") ) {
+    // unselect the option
+    $(selectedMonthButton).removeClass('active');
+
+    selectedMonthButton = null;
+    selectedMonth = null;
+    console.log("Unselected month " + target.text)
+  } else {
+    // change the active option (if any option has it, otherwise ok)
+    $(selectedMonthButton).removeClass('active');
+    $(target).addClass('active');
+
+    selectedMonth = parseInt(target.text);
+    selectedMonthButton = target;
+    console.log("Selected month: " + target.text)
+  }
+  // update the numbers and map (needs to be done after both selection & unselection)
+  precompute_data()
+  visualization()  
+});
+
+// Year changing
 $("#select_year_btn").on("click", function(event){
-  console.log("You clicked the year drop down", event)
-})
+  console.log("You clicked the year drop down", event);
+});
 
-$(".dropdown-menu").on("click", function(event){
-  console.log("You clicked drop down menu", event)
-})
+$(".year-item").on("click", function(event){
+  var target = event.target;
+  if ( $(target).hasClass("active") ) {
+    // unselect the option
+    $(selectedYearButton).removeClass('active');
+
+    selectedYearButton = null;
+    selectedYear = null;
+    console.log("Unselected year " + target.text)
+  } else {
+    // change the active option (if any option has it, otherwise ok)
+    $(selectedYearButton).removeClass('active');
+    $(target).addClass('active');
+
+    selectedYear = parseInt(target.text);
+    selectedYearButton = target;
+    console.log("Selected year: " + target.text)
+  }
+  // update the numbers and map (needs to be done after both selection & unselection)
+  precompute_data()
+  visualization()
+});
+
+// Mode swaping
+$("#absolute-numbers-button").on("click", function(event){
+  if (selectedMode != "Abs") {
+    selectedMode = "Abs";
+    console.log("Selected mode: Absolute");
+    // TODO: update the numbers and map
+  } else {
+    // no need to change anything
+    console.log("Selected mode: Absolute (no change)");
+  }
+});
+
+$("#relative-numbers-button").on("click", function(event){
+  if (selectedMode != "Rel") {
+    selectedMode = "Rel";
+    console.log("Selected mode: Relative");
+    // TODO: update the numbers and map
+  } else {   
+    // no need to change anything
+    console.log("Selected mode: Relative (no change)");
+  }
+});
