@@ -85,12 +85,12 @@ body{
 }
 
 .state_drop_menu{
-  width: 40%;
+  width: 50%;
   height: 10vh;
   float: left;
 }
 
-.state_drop_stats{
+.state_stats{
   width: 50%;
   height: 10vh;
   float: left;
@@ -131,8 +131,8 @@ body{
 }
 
 .subline{
-  font-size: 50%;
-  font-weight: thin;
+  font-size: 80%;
+  font-weight: thick;
 }
 
 .label{

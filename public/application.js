@@ -2,6 +2,7 @@
 var dataShootings;
 var dataShootingsByStates;
 var dataStateNameMappings;
+var dataStateNameMappingsReversed;
 
 //D3.js canvases
 var mainArea;
@@ -27,14 +28,15 @@ var statesAttributesMenuArea;
 
 //variables for selection
 var selectedStateMainMap;
-var previousSelectedStateMainMap;
+var selectedStateButton;
 
 var selectedYear;
 var selectedYearButton;
+
 var selectedMonth;
 var selectedMonthButton;
-
 var selectedMode;
+
 
 // other global variables for precomputed values
 //TODO
@@ -72,6 +74,11 @@ d3.csv("./public/us_police_shootings_dataset.csv")
     d3.json("./public/states_dict.json", function (error, d_states) {
       // saving reference to data regarding mapping of state names
       dataStateNameMappings = d_states;
+      // save also reverse mapping
+      dataStateNameMappingsReversed = {};
+      for(var key in d_states){
+        dataStateNameMappingsReversed[d_states[key]] = key;
+      }      
     
       //load map and initialise the views
       init();
@@ -92,8 +99,7 @@ function init() {
   let height = screen.height;
 
   // initial selections for the main map
-  selectedStateMainMap = "USA";
-  previousSelectedStateMainMap = "USA";
+  selectedStateMainMap = null;
 
   // initial time selections
   selectedYear = null;
@@ -130,22 +136,59 @@ function init() {
 
   
   // d3 canvases for svg elements
+  // title
   titleArea = d3.select("#title_div").append("svg")
     .attr("width", d3.select("#title_div").node().clientWidth)
     .attr("height", d3.select("#title_div").node().clientHeight);
   
+  // main map stats
   usMapStatsArea = d3.select("#us_map_stats_div").append("svg")
     .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
     .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
-  
-  usMapStatsArea = d3.select("#us_map_options_div").append("svg")
-    .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
-    .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
-  
-  precompute_data()
+    
+  // zoom state1 map
+  state1MapArea = d3.select("#state1_map_div").append("svg")
+    .attr("width", d3.select("#state1_map_div").node().clientWidth)
+    .attr("height", d3.select("#state1_map_div").node().clientHeight);
 
-  // Title stays always the same
+  // zoom state1 name info
+  state1DropMenuArea = d3.select("#state1_drop_menu_div").append("svg")
+    .attr("width", d3.select("#state1_drop_menu_div").node().clientWidth)
+    .attr("height", d3.select("#state1_drop_menu_div").node().clientHeight)
+    .attr("x", d3.select("#state1_drop_menu_div").node().clientWidth);
+
+  // add elements to dropdowns (too much to add using HTML tags) 
+  addDropDownOptions();
+
+  // precompute division to states, highest value, etc.
+  precompute_data();
+
+  // title stays always the same, just add it once now
   drawTitle();
+}
+
+// Append options to dropdowns (state names, years, months)
+function addDropDownOptions() {
+  var dropDownMenu = $('#select_month_menu');
+  for (var i = 1; i <= 12; i++) {
+    dropDownMenu.append($('<a class="dropdown-item month-item" href="#">' + i + '</a>'));
+  }
+
+  var dropDownMenu = $('#select_year_menu');
+  for (var i = 2016; i <= 2022; i++) {
+    dropDownMenu.append($('<a class="dropdown-item year-item" href="#">' + i + '</a>'));
+  }
+
+  var dropDownMenu = $('#select_state_menu');
+  // add the state names sorted
+  var list_states = [];
+  for (var key in dataStateNameMappings) {
+    list_states.push(dataStateNameMappings[key]);
+  }
+  list_states.sort();
+  for (var s of list_states) {
+    dropDownMenu.append($('<a class="dropdown-item state-item" href="#">' + s + '</a>'));
+  }
 }
 
 // Precompute data division, and color scheme 
@@ -195,7 +238,6 @@ BEGINNING OF VISUALIZATION
 ----------------------*/
 function visualization() {
   drawUsMapStats();
-  drawUsMapOptions();
   colorMap();
 }
 
@@ -210,28 +252,21 @@ function drawTitle() {
 }
 
 /*----------------------
-MAP OPTIONS (buttons, dropdowns)
-----------------------*/
-function drawUsMapOptions() {
-  //Draw headline
-  titleArea.append("text")
-    .attrs({ dx: 200, dy: "2em", class: "headline" })
-    .text("Police Shootings in the US");
-}
-
-/*----------------------
 STATS AND LEGEND FOR THE MAIN MAP
 ----------------------*/
 function drawUsMapStats() {
-  //set up a gradient variable for linear gradient
-  //this is a storage elemnt that is appended as separate xml tag to svg, but does not result any "graphical output"
+  // remove existing stuff
+  usMapStatsArea.text("")
+
+  // set up a gradient variable for linear gradient
+  // this is a storage elemnt that is appended as separate xml tag to svg, but does not result any "graphical output"
   var gradient = usMapStatsArea.append("linearGradient")
     .attr("id", "svgGradient")
     .attr("x1", "0%")
     .attr("x2", "100%");
 
-  //append gradient "stops" - control points at varius gardient offsets with specific colors
-  //you can set up multiple stops, minumum are 2
+  // append gradient "stops" - control points at varius gardient offsets with specific colors
+  // you can set up multiple stops, minumum are 2
   gradient.append("stop")
     .attr('offset', "0%") //starting color
     .attr("stop-color", myColorScale(0));
@@ -244,7 +279,7 @@ function drawUsMapStats() {
     .attr('offset', "100%") //end color
     .attr("stop-color",  myColorScale(highestAbsoluteValue));
 
-  //append rectangle with gradient fill  
+  // append rectangle with gradient fill  
   usMapStatsArea.append('rect').attrs({ x: 0, 
             y: usMapStatsArea.node().clientHeight - 30, 
             width: usMapStatsArea.node().clientWidth * 0.8, 
@@ -253,24 +288,24 @@ function drawUsMapStats() {
             fill: 'url(#svgGradient)'}) //gradient color fill is set as url to svg gradient element
           .style("stroke-width", 3);
 
-  //min and max labels         
+  // min and max labels
   usMapStatsArea.append("text")
-    .attrs({x: 0, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
-    .text("min");
+    .attrs({x: 0, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
+    .text(0);
   usMapStatsArea.append("text")
-    .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 30, class: "subline"})
+    .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
     .attr("text-anchor", "end")
-    .text("max");
+    .text(highestAbsoluteValue);
 }
 
 /*----------------------
 COLOR THE MAIN MAP
 ----------------------*/
 function colorMap() {
-  //set the state color corresponding to the number of cases
+  // set the state color corresponding to the number of cases
   for (var key in dataStateNameMappings) {
     var color = myColorScale(dataShootingsByStates[key].length);
-    d3.select('#'+key).style("fill", color).raise();
+    d3.select('path#'+key).style("fill", color);
   }
 }
 
@@ -281,23 +316,72 @@ function mainMapClick(stateId) {
   // TODO: move color map somewhere else
   colorMap();
 
-  // TODO
-  previousSelectedStateMainMap = selectedStateMainMap;
-  selectedStateMainMap = stateId;
+  if (selectedStateMainMap == stateId) {
+    // unselect the state on map
+    d3.select('#'+selectedStateMainMap).style("stroke", "gray");
+    selectedStateMainMap = null;
 
-  if (selectedStateMainMap == previousSelectedStateMainMap) {
-    var origColor = myColorScale(dataShootingsByStates[selectedStateMainMap].length);
-    d3.select('#'+selectedStateMainMap).style("fill", origColor).raise();
-    selectedStateMainMap = "USA";
+    // remove the state name from the text area
+    state1DropMenuArea.text("");
     console.log("Unselected");
+
+    // unselect it in the dropdown menu
+    $(selectedStateButton).removeClass('active');
+    selectedStateButton = null;
+    //$( '.state-item:contains(' + dataStateNameMappings[stateId] + ')' ).removeClass('active');
+
+    // TODO: remove the state from the zoom area
   } else {
-    // if some state was selected before, color it back
-    if (previousSelectedStateMainMap != "USA") {
-      var origColor = myColorScale(dataShootingsByStates[previousSelectedStateMainMap].length);
-      d3.select('#'+previousSelectedStateMainMap).style("fill", origColor).raise();
+    // if some other state was selected before, unselect it first
+    if (selectedStateMainMap != null) {
+      // unselect on map
+      d3.select('#'+selectedStateMainMap).style("stroke", "gray");
+      // remove state name on from the text area
+      state1DropMenuArea.text("");
+      // unselect in the dropdown menu
+      $(selectedStateButton).removeClass('active');
+
+      // TODO: remove the state from the zoom area
     }
-    d3.select('#'+selectedStateMainMap).style("fill", 'white').raise();
+    // select the new state on the map
+    selectedStateMainMap = stateId;
+    d3.select('#'+selectedStateMainMap).style("stroke", "white").raise();
+    // add state name to the text area
+    state1DropMenuArea.append("text")
+      .attrs({ dx: 0, dy: "1em", class: "headline"})
+      .text(dataStateNameMappings[selectedStateMainMap]);
+    // select in the dropdown menu
+    selectedStateButton = $( '.state-item:contains(' + dataStateNameMappings[stateId] + ')' );
+    selectedStateButton.addClass('active');
+
     console.log("Selected:", dataStateNameMappings[selectedStateMainMap]);
+
+    // TODO: show the state in the zoom area
+    /*
+    //retrieve an SVG file via d3.request, 
+    //the xhr.responseXML property is a document instance
+    function responseCallback(xhr) {
+      d3.select("#state1_map_div").append(function () {
+        return xhr.responseXML.querySelector('svg');
+      }).attr("id", "map_state1")
+        .attr("width", width / 2)
+        .attr("height", height / 2)
+        .attr("x", 0)
+        .attr("y", 0);
+    };
+
+    // Select the root <svg> and append it directly
+    d3.request("public/us_map_copy.svg")
+      .mimeType("image/svg+xml")
+      .get(function (n) {
+        d3.select("body").select("#map_state1")
+          .selectAll("path")
+          .style("fill", "lightgray")
+          .style("stroke", "gray")
+          .style("stroke-width", 3);
+      })
+      .response(responseCallback);
+    */
   }
 }
 
@@ -305,12 +389,12 @@ function mainMapClick(stateId) {
 INTERACTION WITH THE BUTTONS AND DROPDOWNS
 ----------------------*/
 
-// Month changing
+/* -------------- MONTH CHANGING -------------- */
 $("#select_month_btn").on("click", function(event){
   console.log("You clicked the month drop down", event);
 });
 
-$(".month-item").on("click", function(event){
+$(document).on("click", ".month-item", function(event){  
   var target = event.target;
   if ( $(target).hasClass("active") ) {
     // unselect the option
@@ -326,19 +410,19 @@ $(".month-item").on("click", function(event){
 
     selectedMonth = parseInt(target.text);
     selectedMonthButton = target;
-    console.log("Selected month: " + target.text)
+    console.log("Selected month: " + target.text);
   }
   // update the numbers and map (needs to be done after both selection & unselection)
-  precompute_data()
-  visualization()  
+  precompute_data();
+  visualization();
 });
 
-// Year changing
+/* -------------- YEAR CHANGING -------------- */
 $("#select_year_btn").on("click", function(event){
   console.log("You clicked the year drop down", event);
 });
 
-$(".year-item").on("click", function(event){
+$(document).on("click", ".year-item", function(event){
   var target = event.target;
   if ( $(target).hasClass("active") ) {
     // unselect the option
@@ -357,11 +441,11 @@ $(".year-item").on("click", function(event){
     console.log("Selected year: " + target.text)
   }
   // update the numbers and map (needs to be done after both selection & unselection)
-  precompute_data()
-  visualization()
+  precompute_data();
+  visualization();
 });
 
-// Mode swaping
+/* -------------- MODE SWAPING -------------- */
 $("#absolute-numbers-button").on("click", function(event){
   if (selectedMode != "Abs") {
     selectedMode = "Abs";
@@ -382,4 +466,21 @@ $("#relative-numbers-button").on("click", function(event){
     // no need to change anything
     console.log("Selected mode: Relative (no change)");
   }
+});
+
+/* -------------- STATE CHANGING -------------- */
+$("#state1_drop_menu_div").on("click", function(event){
+  console.log("You clicked the state1 drop down", event);
+});
+
+$(document).on("click", ".state-item", function(event){
+  // simulate click on the main map
+  /* that alone handles:
+     1) map coloring
+     2) update of selected state
+     3) update of state text
+     4) update of selected dropdown option
+  */
+  var target = event.target;
+  mainMapClick(dataStateNameMappingsReversed[target.text]);
 });

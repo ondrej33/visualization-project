@@ -29,14 +29,9 @@
             <!-- Dropdown -->
             <div class="dropdown mb-3">
               <button id="select_year_btn" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown">Year</button>
-              <div class="dropdown-menu">
-                <a class="dropdown-item year-item" href="#">2016</a>
-                <a class="dropdown-item year-item" href="#">2017</a>
-                <a class="dropdown-item year-item" href="#">2018</a>
-                <a class="dropdown-item year-item" href="#">2019</a>
-                <a class="dropdown-item year-item" href="#">2020</a>
-                <a class="dropdown-item year-item" href="#">2021</a>
-                <a class="dropdown-item year-item" href="#">2022</a>
+              <div id="select_year_menu" class="dropdown-menu">
+                <!-- Items in following form are added in JS script -->
+                <!-- <a class="dropdown-item year-item" href="#">2016</a> -->
               </div>
             </div>
           </div>  
@@ -44,19 +39,9 @@
             <!-- Dropdown -->
             <div class="dropdown mb-3">
               <button id="select_month_btn" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown">Month</button>
-              <div class="dropdown-menu">
-                <a class="dropdown-item month-item" href="#">1</a>
-                <a class="dropdown-item month-item" href="#">2</a>
-                <a class="dropdown-item month-item" href="#">3</a>
-                <a class="dropdown-item month-item" href="#">4</a>
-                <a class="dropdown-item month-item" href="#">5</a>
-                <a class="dropdown-item month-item" href="#">6</a>
-                <a class="dropdown-item month-item" href="#">7</a>
-                <a class="dropdown-item month-item" href="#">8</a>
-                <a class="dropdown-item month-item" href="#">9</a>
-                <a class="dropdown-item month-item" href="#">10</a>
-                <a class="dropdown-item month-item" href="#">11</a>
-                <a class="dropdown-item month-item" href="#">12</a>
+              <div id="select_month_menu" class="dropdown-menu">
+                <!-- Items in following form are added in JS script -->
+                <!-- <a class="dropdown-item month-item" href="#">1</a> -->
               </div>
             </div>
           </div>  
@@ -75,7 +60,16 @@
 
       <div id="state1_div" class="state">
         <div id="state1_upper" class="state_upper">
-          <div id="state1_drop_menu_div" class="state_drop_menu"></div>
+          <div id="state1_drop_menu_div" class="state_drop_menu">
+            <!-- Dropdown -->
+            <div class="dropdown mb-3">
+              <button id="select_state_btn" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown">State</button>
+              <div id="select_state_menu" class="dropdown-menu">
+                <!-- Items in following form are added in JS script -->
+                <!-- <a class="dropdown-item state-item" href="#">New York</a> -->
+              </div>
+            </div>
+          </div>
           <div id="state1_stats_div" class="state_stats"></div>  
         </div>
         <div id="state1_map_div" class="state_map"></div>
