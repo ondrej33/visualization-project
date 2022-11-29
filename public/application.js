@@ -94,10 +94,6 @@ d3.csv("./public/us_police_shootings_dataset.csv")
 INITIALIZE VISUALIZATION
 ----------------------*/
 function init() {
-
-  let width = screen.width;
-  let height = screen.height;
-
   // initial selections for the main map
   selectedStateMainMap = null;
 
@@ -107,14 +103,17 @@ function init() {
   selectedYearButton = null;
   selectedMonthButton = null;
 
+  var mapWidth = d3.select("#us_map_div").node().clientWidth;
+  var mapHeight = d3.select("#us_map_div").node().clientHeight;
+
   //retrieve an SVG file via d3.request, 
   //the xhr.responseXML property is a document instance
   function responseCallback(xhr) {
     d3.select("#us_map_div").append(function () {
       return xhr.responseXML.querySelector('svg');
     }).attr("id", "map")
-      .attr("width", width / 2)
-      .attr("height", height / 2)
+      .attr("width", mapWidth)
+      .attr("height", mapHeight)
       .attr("x", 0)
       .attr("y", 0);
   };
@@ -247,7 +246,7 @@ TITLE
 function drawTitle() {
   //Draw headline
   titleArea.append("text")
-    .attrs({ dx: 200, dy: "2em", class: "headline" })
+    .attrs({ dx: d3.select("#title_div").node().clientWidth / 5, dy: "2em", class: "headline" })
     .text("Police Shootings in the US");
 }
 
@@ -280,13 +279,14 @@ function drawUsMapStats() {
     .attr("stop-color",  myColorScale(highestAbsoluteValue));
 
   // append rectangle with gradient fill  
-  usMapStatsArea.append('rect').attrs({ x: 0, 
-            y: usMapStatsArea.node().clientHeight - 30, 
-            width: usMapStatsArea.node().clientWidth * 0.8, 
-            height: 18, 
-            stroke: 'white',
-            fill: 'url(#svgGradient)'}) //gradient color fill is set as url to svg gradient element
-          .style("stroke-width", 3);
+  usMapStatsArea.append('rect').attrs({ 
+    x: 0, 
+    y: usMapStatsArea.node().clientHeight - 30, 
+    width: usMapStatsArea.node().clientWidth * 0.8, 
+    height: 18, 
+    stroke: 'white',
+    fill: 'url(#svgGradient)' //gradient color fill is set as url to svg gradient element
+  }).style("stroke-width", 3);
 
   // min and max labels
   usMapStatsArea.append("text")
@@ -296,6 +296,30 @@ function drawUsMapStats() {
     .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
     .attr("text-anchor", "end")
     .text(highestAbsoluteValue);
+
+  // Compute and display some stats
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 30})
+    .text("Stats regarding numbers of cases:");
+
+  var sumValue = 0.;
+  for (var key in dataShootingsByStates) {
+    sumValue += dataShootingsByStates[key].length;
+  }
+
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 50})
+    .text("Total: " + sumValue);
+
+  var averageValue = sumValue / 51;
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 70})
+    .text("Average per state: " + averageValue.toFixed(2));
+
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 90})
+    .text("Highest per state: " + highestAbsoluteValue);
+
 }
 
 /*----------------------
