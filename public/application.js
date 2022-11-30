@@ -1,32 +1,35 @@
-//variable containing reference to data
-var dataShootings;
-var dataShootingsByStates;
-var dataStateNameMappings;
-var dataStateNameMappingsReversed;
+/* variables referencing various types data */
 
-//D3.js canvases
-var mainArea;
+// main dataset regarding shooting cases
+var dataShootings;
+// shooting cases by states, corresponding to selected year+month
+var dataShootingsByStatesRestricted; 
+// mapping state short names to full names
+var dataStateNameMappings;
+// mapping state full names to short names
+var dataStateNameMappingsReversed;
+// mapping attribute short names to full names
+var dataAttribNameMappings;
+// mapping attribute full names to short names
+var dataAttribNameMappingsReversed;
+// attributes to be displayed with their full names and values
+var dataDisplayedAttribs;
+
+/* D3.js canvases */
 var titleArea;
-var usMapArea;
-var usMapOptionsArea;
 var usMapStatsArea;
 
-var zoomArea;
 var state1MapArea;
 var state1DropMenuArea;
 var state1StatsArea;
-var state1PieChartArea;
+var state1ChartArea;
 var state2MapArea;
 var state2DropMenuArea;
 var state2StatsArea;
-var state2PieChartArea;
+var state2ChartArea;
 var statesAttributesMenuArea;
 
-//D3.js svg elements
-//TODO
-//var selectedAreaText;
-
-//variables for selection
+/* variables for current selection */
 var selectedStateMainMap;
 var selectedStateButton;
 
@@ -35,11 +38,13 @@ var selectedYearButton;
 
 var selectedMonth;
 var selectedMonthButton;
+
 var selectedMode;
 
+var selectedAttribute;
+var selectedAttributeButton;
 
-// other global variables for precomputed values
-//TODO
+/* other global variables for precomputed values */
 var numStates = 51;
 var myColorScale;
 var highestAbsoluteValue;
@@ -48,12 +53,12 @@ var highestAbsoluteValue;
 d3.csv("./public/us_police_shootings_dataset.csv")
   .row(function (d) {
     return {
-      id: +d["id"],
-      name: d["name"],
+      //id: +d["id"],
+      //name: d["name"],
       date: new Date(d["date"]),
       manner_of_death: d["manner_of_death"],
       armed_with: d["armed"],
-      age: +d["age"],
+      age: d["age"],
       gender: d["gender"],
       race: d["race"],
       city: d["city"],
@@ -62,13 +67,84 @@ d3.csv("./public/us_police_shootings_dataset.csv")
       threat_level: d["threat_level"],
       flee: d["flee"],
       body_camera: d["body_camera"],
-      longitude: d["longitude"],
-      latitude: d["latitude"],
-      is_geocoding_exact: d["is_geocoding_exact"],
+      //longitude: d["longitude"],
+      //latitude: d["latitude"],
+      //is_geocoding_exact: d["is_geocoding_exact"],
     };
   }).get(function (error, rows) {
     // saving reference to data
     dataShootings = rows;
+
+    // preprocess the data a little bit
+    // 1) define relevant attributes and their values that will be used for visualization
+    dataDisplayedAttribs = {
+      "age": {"full_name": "Age", "values": ["0-20", "21-40", "41-60", "60+", "N/A"]},
+      "gender": {"full_name": "Gender", "values": ["Male", "Female", "N/A"]},
+      "race": {"full_name": "Race", "values": ['White', 'Hispanic', 'Black', 'Other', "N/A"]},
+      "flee": {"full_name": "Fleeing", "values": ['Not fleeing', 'Car', 'Foot', 'Other', 'N/A']},
+      "body_camera": {"full_name": "Body camera", "values": ['False', 'True', 'N/A']},
+    };
+    // 2) preprocess these relevant attributes
+    for (shootingCase of dataShootings) {
+      // age group
+      if (shootingCase["age"] == "") {
+        shootingCase["v_age_group"] = "N/A";
+      } else {
+        var age = parseInt(shootingCase["age"]);
+        if (age < 21) {
+          shootingCase["age"] = "0-20";
+        } else if (age < 41) {
+          shootingCase["age"] = "21-40";
+        } else if (age < 61) {
+          shootingCase["age"] = "41-60";
+        } else {
+          shootingCase["age"] = "61+";
+        }
+      }
+      
+      // gender
+      var gender = shootingCase["gender"];
+      if (gender == "") {
+        shootingCase["gender"] = "N/A";
+      } else if (gender == "M") {
+        shootingCase["gender"] = "Male";
+      } else if (gender == "F") {
+        shootingCase["gender"] = "Female";
+      }
+
+      // race
+      var race = shootingCase["race"];
+      if (race == "") {
+        shootingCase["race"] = "N/A";
+      } else if (race == "W") {
+        shootingCase["race"] = "White";
+      } else if (race == "B") {
+        shootingCase["race"] = "Black";
+      } else if (race == "H") {
+        shootingCase["race"] = "Hispanic";
+      } else {
+        shootingCase["race"] = "Other";
+      }
+
+
+
+
+      // flee
+      var flee = shootingCase["flee"];
+      if (flee == "") {
+        shootingCase["flee"] = "N/A";
+      }
+
+      // body camera
+      var camera = shootingCase["body_camera"];
+      if (camera == "") {
+        shootingCase["body_camera"] = "N/A";
+      } else if (camera == "TRUE") {
+        shootingCase["body_camera"] = "True";
+      } else if (camera == "FALSE") {
+        shootingCase["body_camera"] = "False";
+      }
+    }
 
     /* Loading the <state code - state> mapping data from JSON file */
     d3.json("./public/states_dict.json", function (error, d_states) {
@@ -103,8 +179,12 @@ function init() {
   selectedYearButton = null;
   selectedMonthButton = null;
 
-  var mapWidth = d3.select("#us_map_div").node().clientWidth;
-  var mapHeight = d3.select("#us_map_div").node().clientHeight;
+  // initial attribute selections
+  selectedAttribute = null;
+  selectedAttributeButton = null;
+
+  // initial mode selections
+  selectedMode = "Abs";
 
   //retrieve an SVG file via d3.request, 
   //the xhr.responseXML property is a document instance
@@ -112,8 +192,8 @@ function init() {
     d3.select("#us_map_div").append(function () {
       return xhr.responseXML.querySelector('svg');
     }).attr("id", "map")
-      .attr("width", mapWidth)
-      .attr("height", mapHeight)
+      .attr("width", d3.select("#us_map_div").node().clientWidth)
+      .attr("height", d3.select("#us_map_div").node().clientHeight)
       .attr("x", 0)
       .attr("y", 0);
   };
@@ -156,6 +236,14 @@ function init() {
     .attr("height", d3.select("#state1_drop_menu_div").node().clientHeight)
     .attr("x", d3.select("#state1_drop_menu_div").node().clientWidth);
 
+  // zoom state1 chart
+  state1ChartArea = d3.select("#state1_pie_chart_div")
+  .append("svg")
+    .attr("width", d3.select("#state1_pie_chart_div").node().clientWidth)
+    .attr("height", d3.select("#state1_pie_chart_div").node().clientHeight)
+  .append("g")
+    .attr("transform", "translate(" + d3.select("#state1_pie_chart_div").node().clientWidth / 2 + "," + d3.select("#state1_pie_chart_div").node().clientHeight / 2 + ")");
+
   // add elements to dropdowns (too much to add using HTML tags) 
   addDropDownOptions();
 
@@ -168,16 +256,19 @@ function init() {
 
 // Append options to dropdowns (state names, years, months)
 function addDropDownOptions() {
+  // month dropdown
   var dropDownMenu = $('#select_month_menu');
   for (var i = 1; i <= 12; i++) {
     dropDownMenu.append($('<a class="dropdown-item month-item" href="#">' + i + '</a>'));
   }
 
+  // year dropdown
   var dropDownMenu = $('#select_year_menu');
   for (var i = 2016; i <= 2022; i++) {
     dropDownMenu.append($('<a class="dropdown-item year-item" href="#">' + i + '</a>'));
   }
 
+  // state dropdown
   var dropDownMenu = $('#select_state_menu');
   // add the state names sorted
   var list_states = [];
@@ -187,6 +278,18 @@ function addDropDownOptions() {
   list_states.sort();
   for (var s of list_states) {
     dropDownMenu.append($('<a class="dropdown-item state-item" href="#">' + s + '</a>'));
+  }
+
+  // attribute dropdown
+  var dropDownMenu = $('#select_attrib_menu');
+  dataAttribNameMappings = {};
+  dataAttribNameMappingsReversed = {};
+  for(var key in dataDisplayedAttribs){
+    dataAttribNameMappings[key] = dataDisplayedAttribs[key]["full_name"];
+    dataAttribNameMappingsReversed[dataAttribNameMappings[key]] = key;
+  }
+  for (var attr in dataAttribNameMappingsReversed) {
+    dropDownMenu.append($('<a class="dropdown-item attrib-item" href="#">' + attr + '</a>'));
   }
 }
 
@@ -205,9 +308,9 @@ function precompute_data() {
 
 function divideDataToStates(year, month) {
   // initiate the map with state codes and empty lists
-  dataShootingsByStates = new Map();
+  dataShootingsByStatesRestricted = new Map();
   for (var key in dataStateNameMappings) {
-    dataShootingsByStates[key] = [];
+    dataShootingsByStatesRestricted[key] = [];
   }
 
   // divide cases into the lists by their state
@@ -216,16 +319,16 @@ function divideDataToStates(year, month) {
     // if year or month is not specified, take all, otherwise filter
     if ((year == null || year == shootingCase["date"].getFullYear()) &&
         (month == null || month == shootingCase["date"].getMonth() + 1)) {
-      dataShootingsByStates[state_code].push(shootingCase);
+          dataShootingsByStatesRestricted[state_code].push(shootingCase);
     }
   }
 }
 
 function computeHighestAbsoluteValue() {
   topValue = 0;
-  for (var key in dataShootingsByStates) {
-    if (dataShootingsByStates[key].length > topValue) {
-      topValue = dataShootingsByStates[key].length;
+  for (var key in dataShootingsByStatesRestricted) {
+    if (dataShootingsByStatesRestricted[key].length > topValue) {
+      topValue = dataShootingsByStatesRestricted[key].length;
     }
   }
   return topValue;
@@ -238,6 +341,7 @@ BEGINNING OF VISUALIZATION
 function visualization() {
   drawUsMapStats();
   colorMap();
+  drawPieChart(selectedAttribute, selectedStateMainMap);
 }
 
 /*----------------------
@@ -303,8 +407,8 @@ function drawUsMapStats() {
     .text("Stats regarding numbers of cases:");
 
   var sumValue = 0.;
-  for (var key in dataShootingsByStates) {
-    sumValue += dataShootingsByStates[key].length;
+  for (var key in dataShootingsByStatesRestricted) {
+    sumValue += dataShootingsByStatesRestricted[key].length;
   }
 
   usMapStatsArea.append("text")
@@ -328,10 +432,84 @@ COLOR THE MAIN MAP
 function colorMap() {
   // set the state color corresponding to the number of cases
   for (var key in dataStateNameMappings) {
-    var color = myColorScale(dataShootingsByStates[key].length);
+    var color = myColorScale(dataShootingsByStatesRestricted[key].length);
     d3.select('path#'+key).style("fill", color);
   }
 }
+
+/*----------------------
+DRAW PIE CHART 
+----------------------*/
+function drawPieChart(attribute, state) {
+  console.log("Pie chart for:",attribute, state)
+  // remove current visualization if some exists
+  d3.select("#state1_pie_chart_div").select('svg').select('g').html("")
+
+  // if no state or attribute selected return
+  if (attribute == null || state == null) {
+    return;
+  }
+  // compute how many cases of each attribute's value we have in the current 
+  // dataset (potentially restricted by year+month) for the given state
+
+  // current data for only the given state
+  currentDataState = dataShootingsByStatesRestricted[state];
+
+  // compute attr value counts
+  map_attr_vals = {};
+  for (var attr_val of dataDisplayedAttribs[attribute]["values"]) {
+    map_attr_vals[attr_val] = 0;
+  }
+  for (var shootingCase of currentDataState) {
+    map_attr_vals[shootingCase[attribute]] += 1;
+  }
+
+  // create the same data indexed by nums (will be used as color values)
+  var data = {};
+  var i = 1;
+  for (var attr in map_attr_vals) {
+    data[i] = map_attr_vals[attr];
+    i++;
+  }
+
+  // set the color scale
+  var pieColorScale = d3.scaleSequential().domain([1, dataDisplayedAttribs[attribute]["values"].length]).interpolator(d3.interpolatePlasma);
+
+  // compute the position of each group on the pie:
+  var pie = d3.pie()
+    .value(function(d) {return d.value; })
+  var data_ready = pie(d3.entries(data))
+  var radius = Math.min(d3.select("#state1_pie_chart_div").node().clientWidth, d3.select("#state1_pie_chart_div").node().clientHeight) / 2;
+
+  // build the pie chart: each part of the pie is a path that we build using the arc function
+  state1ChartArea
+    .selectAll('whatever')
+    .data(data_ready)
+    .enter()
+    .append('path')
+    .attr('d', d3.arc()
+      .innerRadius(radius / 3)
+      .outerRadius(radius)
+    )
+    .attr('fill', function(d){ return(pieColorScale(d.data.key)) })
+    .attr("stroke", "black")
+    .style("stroke-width", "2px")
+    .style("opacity", 0.7);
+
+  /*
+  // add annotation using the centroid method (to get the best coordinates)
+  state1ChartArea
+    .selectAll('whatever')
+    .data(data_ready)
+    .enter()
+    .append('text')
+    .text(function(d){ return "grp " + d.data.key})
+    .attr("transform", function(d) { return "translate(" + arcGenerator.centroid(d) + ")";  })
+    .style("text-anchor", "middle")
+    .style("font-size", 17);
+  */
+}
+
 
 /*----------------------
 INTERACTION WITH THE MAIN MAP
@@ -341,20 +519,24 @@ function mainMapClick(stateId) {
   colorMap();
 
   if (selectedStateMainMap == stateId) {
+    console.log("Unselected state: " + dataStateNameMappings[selectedStateMainMap]);
     // unselect the state on map
     d3.select('#'+selectedStateMainMap).style("stroke", "gray");
     selectedStateMainMap = null;
 
     // remove the state name from the text area
     state1DropMenuArea.text("");
-    console.log("Unselected");
 
     // unselect it in the dropdown menu
     $(selectedStateButton).removeClass('active');
     selectedStateButton = null;
     //$( '.state-item:contains(' + dataStateNameMappings[stateId] + ')' ).removeClass('active');
 
+    // redraw state chart (will remove chart)
+    drawPieChart(selectedAttribute, selectedStateMainMap);
+
     // TODO: remove the state from the zoom area
+
   } else {
     // if some other state was selected before, unselect it first
     if (selectedStateMainMap != null) {
@@ -377,8 +559,10 @@ function mainMapClick(stateId) {
     // select in the dropdown menu
     selectedStateButton = $( '.state-item:contains(' + dataStateNameMappings[stateId] + ')' );
     selectedStateButton.addClass('active');
+    // redraw state chart
+    drawPieChart(selectedAttribute, selectedStateMainMap);
 
-    console.log("Selected:", dataStateNameMappings[selectedStateMainMap]);
+    console.log("Selected state:", dataStateNameMappings[selectedStateMainMap]);
 
     // TODO: show the state in the zoom area
     /*
@@ -426,7 +610,7 @@ $(document).on("click", ".month-item", function(event){
 
     selectedMonthButton = null;
     selectedMonth = null;
-    console.log("Unselected month " + target.text)
+    console.log("Unselected month: " + target.text);
   } else {
     // change the active option (if any option has it, otherwise ok)
     $(selectedMonthButton).removeClass('active');
@@ -454,7 +638,7 @@ $(document).on("click", ".year-item", function(event){
 
     selectedYearButton = null;
     selectedYear = null;
-    console.log("Unselected year " + target.text)
+    console.log("Unselected year: " + target.text)
   } else {
     // change the active option (if any option has it, otherwise ok)
     $(selectedYearButton).removeClass('active');
@@ -462,7 +646,7 @@ $(document).on("click", ".year-item", function(event){
 
     selectedYear = parseInt(target.text);
     selectedYearButton = target;
-    console.log("Selected year: " + target.text)
+    console.log("Selected year: " + target.text);
   }
   // update the numbers and map (needs to be done after both selection & unselection)
   precompute_data();
@@ -504,7 +688,39 @@ $(document).on("click", ".state-item", function(event){
      2) update of selected state
      3) update of state text
      4) update of selected dropdown option
+     5) update of the state pie chart
   */
   var target = event.target;
   mainMapClick(dataStateNameMappingsReversed[target.text]);
+});
+
+/* -------------- ATTRIB CHANGING -------------- */
+$("#select_attrib_btn").on("click", function(event){
+  console.log("You clicked the attribute drop down", event);
+});
+
+$(document).on("click", ".attrib-item", function(event){
+  var target = event.target;
+  if ( $(target).hasClass("active") ) {
+    // unselect the option
+    $(target).removeClass('active');
+
+    selectedAttributeButton = null;
+    selectedAttribute = null;
+    console.log("Unselected attribute: " + target.text)
+
+    // redraw state chart (will remove the chart)
+    drawPieChart(selectedAttribute, selectedStateMainMap);
+  } else {
+    // change the active option (if any option has it, otherwise ok)
+    $(selectedAttributeButton).removeClass('active');
+    $(target).addClass('active');
+    selectedAttribute = dataAttribNameMappingsReversed[target.text];
+    selectedAttributeButton = target;
+
+    // redraw state chart
+    drawPieChart(selectedAttribute, selectedStateMainMap);
+
+    console.log("Selected attribute: " + target.text);
+  }
 });
