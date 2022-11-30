@@ -83,6 +83,7 @@ body{
   width: 100%;
   height: 10vh;
   float: left;
+  padding-left: 20px;
 }
 
 .state_drop_menu{
@@ -140,4 +141,12 @@ body{
   font-family: 'PT Sans',sans-serif;
   opacity: 1;
   font-size: 30%;
+}
+
+.dropdown-menu .attrib-item.active{
+  background-color: grey;
+}
+
+.dropdown-menu .attrib-item:hover{
+  background-color: grey;
 }
