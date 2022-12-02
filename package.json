@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "bootstrap": "^5.2.3",
+    "d3-geo": "^3.0.1",
     "express": "^4.17.1"
   }
 }

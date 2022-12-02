@@ -14,6 +14,11 @@ var dataAttribNameMappings;
 var dataAttribNameMappingsReversed;
 // attributes to be displayed with their full names and values
 var dataDisplayedAttribs;
+// month number to name mappings
+var dataMonthNameMappings;
+// month name to number mappings
+var dataMonthNameMappingsReversed;
+
 
 /* D3.js canvases */
 var titleArea;
@@ -126,9 +131,6 @@ d3.csv("./public/us_police_shootings_dataset.csv")
         shootingCase["race"] = "Other";
       }
 
-
-
-
       // flee
       var flee = shootingCase["flee"];
       if (flee == "") {
@@ -154,6 +156,26 @@ d3.csv("./public/us_police_shootings_dataset.csv")
       dataStateNameMappingsReversed = {};
       for(var key in d_states){
         dataStateNameMappingsReversed[d_states[key]] = key;
+      }      
+
+      // save month num <-> names mappings
+      dataMonthNameMappings = {
+        1: "January",
+        2: "February",
+        3: "March",
+        4: "April",
+        5: "May",
+        6: "June",
+        7: "July",
+        8: "August",
+        9: "September",
+        10: "October",
+        11: "November",
+        12: "December"
+      };
+      dataMonthNameMappingsReversed = {};
+      for(var key in dataMonthNameMappings){
+        dataMonthNameMappingsReversed[dataMonthNameMappings[key]] = key;
       }      
     
       //load map and initialise the views
@@ -212,7 +234,6 @@ function init() {
           mainMapClick(this.id);
         });
     });
-
   
   // d3 canvases for svg elements
   // title
@@ -235,6 +256,11 @@ function init() {
     .attr("width", d3.select("#state1_drop_menu_div").node().clientWidth)
     .attr("height", d3.select("#state1_drop_menu_div").node().clientHeight)
     .attr("x", d3.select("#state1_drop_menu_div").node().clientWidth);
+
+  // zoom state1 stats 
+  state1StatsArea = d3.select("#state1_stats_div").append("svg")
+    .attr("width", d3.select("#state1_stats_div").node().clientWidth)
+    .attr("height", d3.select("#state1_stats_div").node().clientHeight)
 
   // zoom state1 chart
   state1ChartArea = d3.select("#state1_pie_chart_div")
@@ -264,7 +290,7 @@ function addDropDownOptions() {
   // month dropdown
   var dropDownMenu = $('#select_month_menu');
   for (var i = 1; i <= 12; i++) {
-    dropDownMenu.append($('<a class="dropdown-item month-item">' + i + '</a>'));
+    dropDownMenu.append($('<a class="dropdown-item month-item">' + dataMonthNameMappings[i] + '</a>'));
   }
 
   // year dropdown
@@ -308,7 +334,7 @@ function precompute_data() {
   highestAbsoluteValue = computeHighestAbsoluteValue();
     
   // initialize color scale
-  myColorScale = d3.scaleSequential().domain([0, highestAbsoluteValue]).interpolator(d3.interpolatePlasma);
+  myColorScale = d3.scaleSequential().domain([0, highestAbsoluteValue]).interpolator(d3.interpolateYlOrRd);
 }
 
 function divideDataToStates(year, month) {
@@ -347,6 +373,7 @@ function visualization() {
   drawUsMapStats();
   colorMap();
   drawPieChart(selectedAttribute, selectedStateMainMap);
+  drawStateStats(selectedStateMainMap);
 }
 
 /*----------------------
@@ -408,26 +435,52 @@ function drawUsMapStats() {
 
   // Compute and display some stats
   usMapStatsArea.append("text")
-    .attrs({x: 0, y: 30})
-    .text("Stats regarding numbers of cases:");
+    .attrs({x: 0, y: 40})
+    .text("STATS REGARDING NUMBERS OF CASES");
 
+  // compute min, sum, average and mid, ... values first
+  var minValue = 1000000; // some large value
   var sumValue = 0.;
+  var medianValue = 0;
+  var midIndex = Math.floor(numStates / 2);
+  var i = 0;
   for (var key in dataShootingsByStatesRestricted) {
-    sumValue += dataShootingsByStatesRestricted[key].length;
+    value = dataShootingsByStatesRestricted[key].length;
+    sumValue += value;
+    if (i == midIndex) {
+      medianValue = value;
+    }
+    if (value < minValue) {
+      minValue = value;
+    }
+    i++;
   }
-
-  usMapStatsArea.append("text")
-    .attrs({x: 0, y: 50})
-    .text("Total: " + sumValue);
-
   var averageValue = sumValue / 51;
+  
+  // total number of cases
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 70})
-    .text("Average per state: " + averageValue.toFixed(2));
-
+    .text("Total: " + sumValue);
+  
+  // highest number of cases per state
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 90})
     .text("Highest per state: " + highestAbsoluteValue);
+
+  // least number of cases per state
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 110})
+    .text("Lowest per state: " + minValue);
+
+  // average number of cases per state
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 130})
+    .text("Average per state: " + averageValue.toFixed(2));
+
+  // median number of cases per state
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 150})
+    .text("Median per state: " + medianValue);
 
 }
 
@@ -459,6 +512,10 @@ function drawPieChart(attribute, state) {
 
   // current data for only the given state
   currentDataState = dataShootingsByStatesRestricted[state];
+  // if no data for current (time and state) selection, return
+  if (currentDataState.length == 0) {
+    return;
+  }
 
   // compute attr value counts
   dataAttrValueCount = {};
@@ -470,13 +527,13 @@ function drawPieChart(attribute, state) {
   }
 
   // set the color scale
-  var pieColorScale = d3.scaleSequential().domain([0, dataDisplayedAttribs[attribute]["values"].length - 1]).interpolator(d3.interpolatePlasma);
+  var pieColorScale = d3.scaleSequential().domain([0, dataDisplayedAttribs[attribute]["values"].length - 1]).interpolator(d3.interpolateCubehelixLong("purple", "orange"));
 
   // compute the position of each group on the pie:
   var pie = d3.pie()
     .value(function(d) {return d.value; })
   var pieData = pie(d3.entries(dataAttrValueCount))
-  var radius = Math.min(d3.select("#state1_pie_chart_div").node().clientWidth, d3.select("#state1_pie_chart_div").node().clientHeight) / 2;
+  var radius = Math.min(d3.select("#state1_pie_chart_div").node().clientWidth, d3.select("#state1_pie_chart_div").node().clientHeight) / 2 - 3;
 
   // build the pie chart: each part of the pie is a path that we build using the arc function
   console.log(pieData)
@@ -539,6 +596,52 @@ function drawPieChart(attribute, state) {
 }
 
 
+function drawStateStats(state) {
+  // remove existing stuff
+  state1StatsArea.text("")
+
+  if (state == null) {
+    return;
+  }
+
+  // Compute and display some stats
+  state1StatsArea.append("text")
+    .attrs({x: 0, y: 20})
+    .text("INFO REGARDING THE STATE");
+
+  // compute some numbers first
+  var casesState = dataShootingsByStatesRestricted[state];
+  var numCasesState = casesState.length;
+  var rankStateAbs = 1; // rank can be in some range, if more states have same value
+  var sameNumCases = 0;
+
+  for (var key in dataShootingsByStatesRestricted) {
+    value = dataShootingsByStatesRestricted[key].length;
+    if (value > numCasesState) {
+      rankStateAbs++;
+    }
+    if (value == numCasesState) {
+      sameNumCases++;
+    }
+  }
+  
+  // total number of cases in state
+  state1StatsArea.append("text")
+    .attrs({x: 0, y: 50})
+    .text("Number of cases: " + numCasesState);
+  
+  // rank of the state (1 = highest)
+  var sameNumCasesString = "";
+  if (sameNumCases > 0) {
+    sameNumCasesString = " - " + (rankStateAbs + sameNumCases);
+  }
+  state1StatsArea.append("text")
+    .attrs({x: 0, y: 70})
+    .text("Rank: " + rankStateAbs + sameNumCasesString);
+}
+
+
+
 /*----------------------
 INTERACTION WITH THE MAIN MAP
 ----------------------*/
@@ -549,7 +652,7 @@ function mainMapClick(stateId) {
   if (selectedStateMainMap == stateId) {
     console.log("Unselected state: " + dataStateNameMappings[selectedStateMainMap]);
     // unselect the state on map
-    d3.select('#'+selectedStateMainMap).style("stroke", "gray");
+    d3.select('#'+selectedStateMainMap).style("stroke", "gray").style("stroke-width", 3);
     selectedStateMainMap = null;
 
     // remove the state name from the text area
@@ -566,13 +669,17 @@ function mainMapClick(stateId) {
     // redraw state chart (will remove chart)
     drawPieChart(selectedAttribute, selectedStateMainMap);
 
+    // remove state stats
+    state1StatsArea.text("");
+
     // TODO: remove the state from the zoom area
 
   } else {
     // if some other state was selected before, unselect it first
     if (selectedStateMainMap != null) {
       // unselect on map
-      d3.select('#'+selectedStateMainMap).style("stroke", "gray");
+      d3.select('#'+selectedStateMainMap).style("stroke", "gray").style("stroke-width", 3)
+      ;
       // unselect in the dropdown menu
       $(selectedStateButton).removeClass('active');
 
@@ -580,10 +687,13 @@ function mainMapClick(stateId) {
     }
     // remove the previous text (can be state name or "nothing selected" text) from the text area
     state1DropMenuArea.text("");
+    // remove stats completely
+    state1StatsArea.text("");
 
     // select the new state on the map
     selectedStateMainMap = stateId;
-    d3.select('#'+selectedStateMainMap).style("stroke", "white").raise();
+    d3.select('#'+selectedStateMainMap).style("stroke", "black").style("stroke-width", 5)
+    .raise();
     // add state name to the text area
     state1DropMenuArea.append("text")
       .attrs({ dx: 0, dy: "1em", class: "headline"})
@@ -593,6 +703,8 @@ function mainMapClick(stateId) {
     selectedStateButton.addClass('active');
     // redraw state chart
     drawPieChart(selectedAttribute, selectedStateMainMap);
+    // add state stats
+    drawStateStats(selectedStateMainMap);
 
     console.log("Selected state:", dataStateNameMappings[selectedStateMainMap]);
 
@@ -640,6 +752,9 @@ $(document).on("click", ".month-item", function(event){
     // unselect the option
     $(selectedMonthButton).removeClass('active');
 
+    // change main button text
+    $("#select_month_btn").text("Month");
+
     selectedMonthButton = null;
     selectedMonth = null;
     console.log("Unselected month: " + target.text);
@@ -648,7 +763,10 @@ $(document).on("click", ".month-item", function(event){
     $(selectedMonthButton).removeClass('active');
     $(target).addClass('active');
 
-    selectedMonth = parseInt(target.text);
+    // change main button text
+    $("#select_month_btn").text(target.text);
+
+    selectedMonth = dataMonthNameMappingsReversed[target.text];
     selectedMonthButton = target;
     console.log("Selected month: " + target.text);
   }
@@ -668,6 +786,9 @@ $(document).on("click", ".year-item", function(event){
     // unselect the option
     $(selectedYearButton).removeClass('active');
 
+    // change main button text
+    $("#select_year_btn").text("Year");
+
     selectedYearButton = null;
     selectedYear = null;
     console.log("Unselected year: " + target.text)
@@ -675,6 +796,9 @@ $(document).on("click", ".year-item", function(event){
     // change the active option (if any option has it, otherwise ok)
     $(selectedYearButton).removeClass('active');
     $(target).addClass('active');
+  
+    // change main button text
+    $("#select_year_btn").text(target.text);
 
     selectedYear = parseInt(target.text);
     selectedYearButton = target;

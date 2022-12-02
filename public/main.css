@@ -143,10 +143,12 @@ body{
   font-size: 30%;
 }
 
-.dropdown-menu .attrib-item.active{
-  background-color: grey;
+.dropdown-menu .dropdown-item:active,
+.dropdown-menu .dropdown-item.active
+{
+  background-color: #6c757d;
 }
 
-.dropdown-menu .attrib-item:hover{
-  background-color: grey;
+.dropdown-menu .dropdown-item:hover:not(.active){
+  background-color: #f0f1f2;
 }
