@@ -3,7 +3,11 @@
 // main dataset regarding shooting cases
 var dataShootings;
 // shooting cases by states, corresponding to selected year+month
-var dataShootingsByStatesRestricted; 
+var dataByStatesRestricted; 
+// shooting cases by states AND cities, corresponding to selected year+month
+var dataCountByCitiesRestricted; 
+// mapping cities to their coords
+var dataCityCoordMappings; 
 // mapping state short names to full names
 var dataStateNameMappings;
 // mapping state full names to short names
@@ -35,7 +39,7 @@ var state2ChartArea;
 var statesAttributesMenuArea;
 
 /* variables for current selection */
-var selectedStateMainMap;
+var selectedState;
 var selectedStateButton;
 
 var selectedYear;
@@ -52,7 +56,7 @@ var selectedAttributeButton;
 /* other global variables for precomputed values */
 var numStates = 51;
 var myColorScale;
-var highestAbsoluteValue;
+var highestAbsVal;
 
 /* Loading the main data from CSV file */
 d3.csv("./public/us_police_shootings_dataset.csv")
@@ -72,9 +76,9 @@ d3.csv("./public/us_police_shootings_dataset.csv")
       threat_level: d["threat_level"],
       flee: d["flee"],
       body_camera: d["body_camera"],
-      //longitude: d["longitude"],
-      //latitude: d["latitude"],
-      //is_geocoding_exact: d["is_geocoding_exact"],
+      lon: d["longitude"],
+      lat: d["latitude"],
+      is_geocoding_exact: d["is_geocoding_exact"],
     };
   }).get(function (error, rows) {
     // saving reference to data
@@ -89,7 +93,8 @@ d3.csv("./public/us_police_shootings_dataset.csv")
       "flee": {"full_name": "Fleeing", "values": ['Not fleeing', 'Car', 'Foot', 'Other', 'N/A']},
       "body_camera": {"full_name": "Body camera", "values": ['True', 'False', 'N/A']},
     };
-    // 2) preprocess these relevant attributes
+    // 2) preprocess these relevant attributes, save some metadata (city coords...)
+    dataCityCoordMappings = new Map();
     for (shootingCase of dataShootings) {
       // age group
       if (shootingCase["age"] == "") {
@@ -146,16 +151,24 @@ d3.csv("./public/us_police_shootings_dataset.csv")
       } else if (camera == "FALSE") {
         shootingCase["body_camera"] = "False";
       }
+
+      // save city coord mapping to the relevant map 
+      if (!dataCityCoordMappings.has(shootingCase["state_code"] + "_" + shootingCase["city"])) {
+        dataCityCoordMappings.set(
+          shootingCase["state_code"] + "_" + shootingCase["city"], 
+          {lat: shootingCase["lat"], lon: shootingCase["lon"], exact: shootingCase["is_geocoding_exact"]}
+        );
+      }
     }
 
     /* Loading the <state code - state> mapping data from JSON file */
-    d3.json("./public/states_dict.json", function (error, d_states) {
+    d3.json("./public/states_dict.json", function (error, dStates) {
       // saving reference to data regarding mapping of state names
-      dataStateNameMappings = d_states;
+      dataStateNameMappings = dStates;
       // save also reverse mapping
       dataStateNameMappingsReversed = {};
-      for(var key in d_states){
-        dataStateNameMappingsReversed[d_states[key]] = key;
+      for(var key in dStates){
+        dataStateNameMappingsReversed[dStates[key]] = key;
       }      
 
       // save month num <-> names mappings
@@ -174,7 +187,7 @@ d3.csv("./public/us_police_shootings_dataset.csv")
         12: "December"
       };
       dataMonthNameMappingsReversed = {};
-      for(var key in dataMonthNameMappings){
+      for (var key in dataMonthNameMappings){
         dataMonthNameMappingsReversed[dataMonthNameMappings[key]] = key;
       }      
     
@@ -193,7 +206,7 @@ INITIALIZE VISUALIZATION
 ----------------------*/
 function init() {
   // initial selections for the main map
-  selectedStateMainMap = null;
+  selectedState = null;
 
   // initial time selections
   selectedYear = null;
@@ -207,6 +220,12 @@ function init() {
 
   // initial mode selections
   selectedMode = "Abs";
+
+  // add elements to dropdowns (too many to add using HTML tags) 
+  addDropDownOptions();
+
+  // precompute division to states, highest value, etc.
+  precomputeData();
 
   //retrieve an SVG file via d3.request, 
   //the xhr.responseXML property is a document instance
@@ -227,9 +246,11 @@ function init() {
     .get(function (n) {
       let map = d3.select("body").select("#map");
       map.selectAll("path")
-        .style("fill", "lightgray")
-        .style("stroke", "gray")
-        .style("stroke-width", 3)
+        .style("fill", function() { // fill states using the defined gradient
+          return myColorScale(dataByStatesRestricted[this.id].length); 
+        })
+        .style("stroke", "grey")
+        .style("stroke-width", 2)
         .on("click", function () {
           mainMapClick(this.id);
         });
@@ -263,18 +284,15 @@ function init() {
     .attr("height", d3.select("#state1_stats_div").node().clientHeight)
 
   // zoom state1 chart
+  // translate moves it to the middle of div
+  var halfWidth = d3.select("#state1_pie_chart_div").node().clientWidth / 2;
+  var halfHeight = d3.select("#state1_pie_chart_div").node().clientHeight / 2;
   state1ChartArea = d3.select("#state1_pie_chart_div")
-  .append("svg")
-    .attr("width", d3.select("#state1_pie_chart_div").node().clientWidth)
-    .attr("height", d3.select("#state1_pie_chart_div").node().clientHeight)
-  .append("g")
-    .attr("transform", "translate(" + d3.select("#state1_pie_chart_div").node().clientWidth / 2 + "," + d3.select("#state1_pie_chart_div").node().clientHeight / 2 + ")");
-
-  // add elements to dropdowns (too much to add using HTML tags) 
-  addDropDownOptions();
-
-  // precompute division to states, highest value, etc.
-  precompute_data();
+    .append("svg")
+      .attr("width", d3.select("#state1_pie_chart_div").node().clientWidth)
+      .attr("height", d3.select("#state1_pie_chart_div").node().clientHeight)
+    .append("g")
+      .attr("transform", "translate(" + halfWidth + "," + halfHeight + ")");
 
   // title stays always the same, just add it once now
   drawTitle();
@@ -302,12 +320,12 @@ function addDropDownOptions() {
   // state dropdown
   var dropDownMenu = $('#select_state_menu');
   // add the state names sorted
-  var list_states = [];
+  var listStates = [];
   for (var key in dataStateNameMappings) {
-    list_states.push(dataStateNameMappings[key]);
+    listStates.push(dataStateNameMappings[key]);
   }
-  list_states.sort();
-  for (var s of list_states) {
+  listStates.sort();
+  for (var s of listStates) {
     dropDownMenu.append($('<a class="dropdown-item state-item">' + s + '</a>'));
   }
 
@@ -326,40 +344,52 @@ function addDropDownOptions() {
 
 // Precompute data division, and color scheme 
 // Important to do this before any modifications of the map
-function precompute_data() {
+function precomputeData() {
   // divide data by states
   divideDataToStates(selectedYear, selectedMonth);
 
   // compute the highest number of shooting in a state
-  highestAbsoluteValue = computeHighestAbsoluteValue();
+  highestAbsVal = computeHighestAbsVal();
     
   // initialize color scale
-  myColorScale = d3.scaleSequential().domain([0, highestAbsoluteValue]).interpolator(d3.interpolateYlOrRd);
+  myColorScale = d3.scaleSequential().domain([0, highestAbsVal]).interpolator(d3.interpolateYlOrRd);
 }
 
 function divideDataToStates(year, month) {
   // initiate the map with state codes and empty lists
-  dataShootingsByStatesRestricted = new Map();
+  dataByStatesRestricted = new Map();
+  dataCountByCitiesRestricted = new Map();
   for (var key in dataStateNameMappings) {
-    dataShootingsByStatesRestricted[key] = [];
+    dataByStatesRestricted[key] = [];
+    dataCountByCitiesRestricted[key] = new Map();
   }
 
   // divide cases into the lists by their state
   for (shootingCase of dataShootings) {
-    var state_code = shootingCase["state_code"];
+    var stateCode = shootingCase["state_code"];
     // if year or month is not specified, take all, otherwise filter
     if ((year == null || year == shootingCase["date"].getFullYear()) &&
         (month == null || month == shootingCase["date"].getMonth() + 1)) {
-          dataShootingsByStatesRestricted[state_code].push(shootingCase);
+          // add the shooting case
+          dataByStatesRestricted[stateCode].push(shootingCase);
+
+          // increment counter for the city, or initiate it to 1 if there is nothiing
+          if (dataCountByCitiesRestricted[stateCode].has(shootingCase["city"])) {
+            dataCountByCitiesRestricted[stateCode].set(
+              shootingCase["city"], 
+              dataCountByCitiesRestricted[stateCode].get(shootingCase["city"]) + 1);
+          } else {
+            dataCountByCitiesRestricted[stateCode].set(shootingCase["city"], 1);
+          }
     }
   }
 }
 
-function computeHighestAbsoluteValue() {
+function computeHighestAbsVal() {
   topValue = 0;
-  for (var key in dataShootingsByStatesRestricted) {
-    if (dataShootingsByStatesRestricted[key].length > topValue) {
-      topValue = dataShootingsByStatesRestricted[key].length;
+  for (var key in dataByStatesRestricted) {
+    if (dataByStatesRestricted[key].length > topValue) {
+      topValue = dataByStatesRestricted[key].length;
     }
   }
   return topValue;
@@ -372,8 +402,9 @@ BEGINNING OF VISUALIZATION
 function visualization() {
   drawUsMapStats();
   colorMap();
-  drawPieChart(selectedAttribute, selectedStateMainMap);
-  drawStateStats(selectedStateMainMap);
+  drawPieChart(selectedAttribute, selectedState);
+  drawStateStats(selectedState);
+  drawSecondMap();
 }
 
 /*----------------------
@@ -408,11 +439,11 @@ function drawUsMapStats() {
 
   gradient.append("stop")
     .attr('offset', "50%") //middle color
-    .attr("stop-color",  myColorScale(highestAbsoluteValue / 2));
+    .attr("stop-color",  myColorScale(highestAbsVal / 2));
     
   gradient.append("stop")
     .attr('offset', "100%") //end color
-    .attr("stop-color",  myColorScale(highestAbsoluteValue));
+    .attr("stop-color",  myColorScale(highestAbsVal));
 
   // append rectangle with gradient fill  
   usMapStatsArea.append('rect').attrs({ 
@@ -431,7 +462,7 @@ function drawUsMapStats() {
   usMapStatsArea.append("text")
     .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
     .attr("text-anchor", "end")
-    .text(highestAbsoluteValue);
+    .text(highestAbsVal);
 
   // Compute and display some stats
   usMapStatsArea.append("text")
@@ -444,8 +475,8 @@ function drawUsMapStats() {
   var medianValue = 0;
   var midIndex = Math.floor(numStates / 2);
   var i = 0;
-  for (var key in dataShootingsByStatesRestricted) {
-    value = dataShootingsByStatesRestricted[key].length;
+  for (var key in dataByStatesRestricted) {
+    value = dataByStatesRestricted[key].length;
     sumValue += value;
     if (i == midIndex) {
       medianValue = value;
@@ -465,7 +496,7 @@ function drawUsMapStats() {
   // highest number of cases per state
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 90})
-    .text("Highest per state: " + highestAbsoluteValue);
+    .text("Highest per state: " + highestAbsVal);
 
   // least number of cases per state
   usMapStatsArea.append("text")
@@ -481,7 +512,6 @@ function drawUsMapStats() {
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 150})
     .text("Median per state: " + medianValue);
-
 }
 
 /*----------------------
@@ -490,9 +520,90 @@ COLOR THE MAIN MAP
 function colorMap() {
   // set the state color corresponding to the number of cases
   for (var key in dataStateNameMappings) {
-    var color = myColorScale(dataShootingsByStatesRestricted[key].length);
+    var color = myColorScale(dataByStatesRestricted[key].length);
     d3.select('path#'+key).style("fill", color);
   }
+}
+
+
+/*----------------------
+DRAW SECOND MAP 
+----------------------*/
+function drawSecondMap() {
+  var projection = d3.geoAlbersUsa()
+		.translate([  // translate to center of screen
+      d3.select("#state1_map_div").node().clientWidth / 2, 
+      d3.select("#state1_map_div").node().clientHeight / 2
+    ])
+		.scale([500]); // scale things down to see entire US
+        
+  // Append Div for tooltip to SVG
+  var tooltipDiv = d3.select("#state1_map_div")
+		.append("div")   
+      .attr("class", "tooltip")               
+      .style("opacity", 0);
+  
+  // Load GeoJSON data and merge with states data
+  d3.json("us-states.json", function(json) { 
+    // Bind the data to the SVG and create one path per GeoJSON feature
+    state1MapArea.selectAll("path")
+      .data(json.features)
+      .enter()
+      .append("path")
+        .attr("id", function(d) {return dataStateNameMappingsReversed[d.properties.name]})
+        .attr("name", function(d) {return d.properties.name})
+        .attr("idx", function(d) {return d.id})
+        .attr("d", d3.geoPath().projection(projection)) // d3.geoPath() creates real path object from the coords
+        .style("stroke", "#fff")
+        .style("stroke-width", "1")
+        .style("fill", function(d) { 
+          var stateCode = dataStateNameMappingsReversed[d.properties.name];
+          return myColorScale(dataByStatesRestricted[stateCode].length); 
+        });
+  
+    var dataCities = new Array();
+    var st = "TX";  // TODO: do in general for any states
+    for (var key of dataCountByCitiesRestricted[st].keys()) {
+      var uniqueName = st + "_" + key; // name for indexing
+      var coordsObj = dataCityCoordMappings.get(uniqueName);
+      
+      // ignore few irrelevant cities without coords or inexact ones
+      if (coordsObj["lon"] == "" || coordsObj["lat"] == "" || coordsObj["exact"] != "TRUE") {
+        continue;
+      }
+
+      dataCities.push({
+        name: key, 
+        val: dataCountByCitiesRestricted[st].get(key), 
+        lon: coordsObj["lon"], 
+        lat: coordsObj["lat"]
+      })
+    }
+    
+    // Map the cities 
+    state1MapArea.selectAll("circle")
+      .data(dataCities)
+      .enter()
+      .append("circle")
+        .attr("cx", function(d) { return projection([d.lon, d.lat])[0]; })
+        .attr("cy", function(d) { return projection([d.lon, d.lat])[1]; })
+        .attr("r", function(d) { return Math.sqrt(d.val); })
+        .style("fill", "rgb(0,0,0)")	
+        .style("opacity", 0.85)	
+      .on("mouseover", function(d) { // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+        tooltipDiv.transition()        
+          .duration(200)      
+          .style("opacity", .9);      
+        tooltipDiv.text(d.name)
+          .style("left", (d3.event.pageX) + "px")     
+          .style("top", (d3.event.pageY - 28) + "px");    
+      })                 
+      .on("mouseout", function(d) { // fade out tooltip on mouse out     
+        tooltipDiv.transition()        
+          .duration(500)      
+          .style("opacity", 0);   
+      });  
+  });
 }
 
 /*----------------------
@@ -511,7 +622,7 @@ function drawPieChart(attribute, state) {
   // dataset (potentially restricted by year+month) for the given state
 
   // current data for only the given state
-  currentDataState = dataShootingsByStatesRestricted[state];
+  currentDataState = dataByStatesRestricted[state];
   // if no data for current (time and state) selection, return
   if (currentDataState.length == 0) {
     return;
@@ -519,8 +630,8 @@ function drawPieChart(attribute, state) {
 
   // compute attr value counts
   dataAttrValueCount = {};
-  for (var attr_val of dataDisplayedAttribs[attribute]["values"]) {
-    dataAttrValueCount[attr_val] = 0;
+  for (var attrVal of dataDisplayedAttribs[attribute]["values"]) {
+    dataAttrValueCount[attrVal] = 0;
   }
   for (var shootingCase of currentDataState) {
     dataAttrValueCount[shootingCase[attribute]] += 1;
@@ -548,7 +659,7 @@ function drawPieChart(attribute, state) {
     )
     .attr('fill', function(d){ return(pieColorScale(d.index)) })
     .attr("stroke", "black")
-    .style("stroke-width", "2px")
+    .style("stroke-width", "1px")
     .style("opacity", 0.7);
 
   var labelHeight = 18;
@@ -579,20 +690,6 @@ function drawPieChart(attribute, state) {
     .attr('y', d => labelHeight * d.index * 1.6 + labelHeight - 50)
     .style('font-family', 'sans-serif')
     .style('font-size', `${labelHeight}px`);
-
-
-  /*
-  // add annotation using the centroid method (to get the best coordinates)
-  state1ChartArea
-    .selectAll('whatever')
-    .data(data_ready)
-    .enter()
-    .append('text')
-    .text(function(d){ return "grp " + d.data.key})
-    .attr("transform", function(d) { return "translate(" + arcGenerator.centroid(d) + ")";  })
-    .style("text-anchor", "middle")
-    .style("font-size", 17);
-  */
 }
 
 
@@ -610,13 +707,13 @@ function drawStateStats(state) {
     .text("INFO REGARDING THE STATE");
 
   // compute some numbers first
-  var casesState = dataShootingsByStatesRestricted[state];
+  var casesState = dataByStatesRestricted[state];
   var numCasesState = casesState.length;
   var rankStateAbs = 1; // rank can be in some range, if more states have same value
   var sameNumCases = 0;
 
-  for (var key in dataShootingsByStatesRestricted) {
-    value = dataShootingsByStatesRestricted[key].length;
+  for (var key in dataByStatesRestricted) {
+    value = dataByStatesRestricted[key].length;
     if (value > numCasesState) {
       rankStateAbs++;
     }
@@ -646,14 +743,13 @@ function drawStateStats(state) {
 INTERACTION WITH THE MAIN MAP
 ----------------------*/
 function mainMapClick(stateId) {
-  // TODO: move color map somewhere else
-  colorMap();
-
-  if (selectedStateMainMap == stateId) {
-    console.log("Unselected state: " + dataStateNameMappings[selectedStateMainMap]);
+  if (selectedState == stateId) {
+    console.log("Unselected state: " + dataStateNameMappings[selectedState]);
     // unselect the state on map
-    d3.select('#'+selectedStateMainMap).style("stroke", "gray").style("stroke-width", 3);
-    selectedStateMainMap = null;
+    d3.select('#'+selectedState)
+      .style("stroke", "gray")
+      .style("stroke-width", 2);
+    selectedState = null;
 
     // remove the state name from the text area
     state1DropMenuArea.text("");
@@ -667,7 +763,7 @@ function mainMapClick(stateId) {
     //$( '.state-item:contains(' + dataStateNameMappings[stateId] + ')' ).removeClass('active');
 
     // redraw state chart (will remove chart)
-    drawPieChart(selectedAttribute, selectedStateMainMap);
+    drawPieChart(selectedAttribute, selectedState);
 
     // remove state stats
     state1StatsArea.text("");
@@ -676,10 +772,11 @@ function mainMapClick(stateId) {
 
   } else {
     // if some other state was selected before, unselect it first
-    if (selectedStateMainMap != null) {
+    if (selectedState != null) {
       // unselect on map
-      d3.select('#'+selectedStateMainMap).style("stroke", "gray").style("stroke-width", 3)
-      ;
+      d3.select('#'+selectedState)
+        .style("stroke", "gray")
+        .style("stroke-width", 2);
       // unselect in the dropdown menu
       $(selectedStateButton).removeClass('active');
 
@@ -691,49 +788,24 @@ function mainMapClick(stateId) {
     state1StatsArea.text("");
 
     // select the new state on the map
-    selectedStateMainMap = stateId;
-    d3.select('#'+selectedStateMainMap).style("stroke", "black").style("stroke-width", 5)
-    .raise();
+    selectedState = stateId;
+    d3.select('#'+selectedState)
+      .style("stroke", "black")
+      .style("stroke-width", 4)
+      .raise();
     // add state name to the text area
     state1DropMenuArea.append("text")
       .attrs({ dx: 0, dy: "1em", class: "headline"})
-      .text(dataStateNameMappings[selectedStateMainMap]);
+      .text(dataStateNameMappings[selectedState]);
     // select in the dropdown menu
     selectedStateButton = $( '.state-item:contains(' + dataStateNameMappings[stateId] + ')' );
     selectedStateButton.addClass('active');
     // redraw state chart
-    drawPieChart(selectedAttribute, selectedStateMainMap);
+    drawPieChart(selectedAttribute, selectedState);
     // add state stats
-    drawStateStats(selectedStateMainMap);
+    drawStateStats(selectedState);
 
-    console.log("Selected state:", dataStateNameMappings[selectedStateMainMap]);
-
-    // TODO: show the state in the zoom area
-    /*
-    //retrieve an SVG file via d3.request, 
-    //the xhr.responseXML property is a document instance
-    function responseCallback(xhr) {
-      d3.select("#state1_map_div").append(function () {
-        return xhr.responseXML.querySelector('svg');
-      }).attr("id", "map_state1")
-        .attr("width", width / 2)
-        .attr("height", height / 2)
-        .attr("x", 0)
-        .attr("y", 0);
-    };
-
-    // Select the root <svg> and append it directly
-    d3.request("public/us_map_copy.svg")
-      .mimeType("image/svg+xml")
-      .get(function (n) {
-        d3.select("body").select("#map_state1")
-          .selectAll("path")
-          .style("fill", "lightgray")
-          .style("stroke", "gray")
-          .style("stroke-width", 3);
-      })
-      .response(responseCallback);
-    */
+    console.log("Selected state:", dataStateNameMappings[selectedState]);
   }
 }
 
@@ -771,7 +843,7 @@ $(document).on("click", ".month-item", function(event){
     console.log("Selected month: " + target.text);
   }
   // update the numbers and map (needs to be done after both selection & unselection)
-  precompute_data();
+  precomputeData();
   visualization();
 });
 
@@ -805,7 +877,7 @@ $(document).on("click", ".year-item", function(event){
     console.log("Selected year: " + target.text);
   }
   // update the numbers and map (needs to be done after both selection & unselection)
-  precompute_data();
+  precomputeData();
   visualization();
 });
 
@@ -866,7 +938,7 @@ $(document).on("click", ".attrib-item", function(event){
     console.log("Unselected attribute: " + target.text)
 
     // redraw state chart (will remove the chart)
-    drawPieChart(selectedAttribute, selectedStateMainMap);
+    drawPieChart(selectedAttribute, selectedState);
   } else {
     // change the active option (if any option has it, otherwise ok)
     $(selectedAttributeButton).removeClass('active');
@@ -875,7 +947,7 @@ $(document).on("click", ".attrib-item", function(event){
     selectedAttributeButton = target;
 
     // redraw state chart
-    drawPieChart(selectedAttribute, selectedStateMainMap);
+    drawPieChart(selectedAttribute, selectedState);
 
     console.log("Selected attribute: " + target.text);
   }
