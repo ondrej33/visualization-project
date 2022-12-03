@@ -68,14 +68,14 @@ body{
 
 #zoom_div{
   width: 100%;
-  height: 80vh;
+  height: 90vh;
   float: left;
   background:#e0eaff;
 }
 
 .state{
   width: 45%;
-  height: 80vh;
+  height: 90vh;
   float: left;
 }
 
@@ -100,7 +100,7 @@ body{
 
 .state_map{
   width: 100%;
-  height: 40vh;
+  height: 50vh;
   float: left;
 }
 
@@ -112,7 +112,7 @@ body{
 
 #states_attributes_menu_div{
   width: 10%;
-  height: 80vh;
+  height: 90vh;
   float: left;
 }
 

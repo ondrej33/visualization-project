@@ -29,10 +29,12 @@ var titleArea;
 var usMapStatsArea;
 
 var state1MapArea;
+var state1MapToolTip;
 var state1DropMenuArea;
 var state1StatsArea;
 var state1ChartArea;
 var state2MapArea;
+var state2MapToolTip;
 var state2DropMenuArea;
 var state2StatsArea;
 var state2ChartArea;
@@ -267,10 +269,13 @@ function init() {
     .attr("width", d3.select("#us_map_stats_div").node().clientWidth)
     .attr("height", d3.select("#us_map_stats_div").node().clientHeight);
     
-  // zoom state1 map
+  // zoom state1 map and tooltip
   state1MapArea = d3.select("#state1_map_div").append("svg")
     .attr("width", d3.select("#state1_map_div").node().clientWidth)
     .attr("height", d3.select("#state1_map_div").node().clientHeight);
+  state1MapToolTip = d3.select("#state1_map_div").append("div")   
+    .attr("class", "tooltip")               
+    .style("opacity", 0);
 
   // zoom state1 name info
   state1DropMenuArea = d3.select("#state1_drop_menu_div").append("svg")
@@ -404,7 +409,7 @@ function visualization() {
   colorMap();
   drawPieChart(selectedAttribute, selectedState);
   drawStateStats(selectedState);
-  drawSecondMap();
+  drawSecondMap(selectedState);
 }
 
 /*----------------------
@@ -529,25 +534,33 @@ function colorMap() {
 /*----------------------
 DRAW SECOND MAP 
 ----------------------*/
-function drawSecondMap() {
-  var projection = d3.geoAlbersUsa()
-		.translate([  // translate to center of screen
-      d3.select("#state1_map_div").node().clientWidth / 2, 
-      d3.select("#state1_map_div").node().clientHeight / 2
-    ])
-		.scale([500]); // scale things down to see entire US
-        
-  // Append Div for tooltip to SVG
-  var tooltipDiv = d3.select("#state1_map_div")
-		.append("div")   
-      .attr("class", "tooltip")               
-      .style("opacity", 0);
-  
+function drawSecondMap(state) {
+  // remove map and tooltip
+  d3.select("#state1_map_div").select('svg').html("");
+  d3.select("#state1_map_div").select('.tooltip').html("");
+
+  // if no state selected, return
+  if (state == null) {
+    return;
+  }
+          
   // Load GeoJSON data and merge with states data
   d3.json("us-states.json", function(json) { 
+    var selStateOnly = json.features.filter((d) => (dataStateNameMappingsReversed[d.properties.name] === state))
+    console.log(selStateOnly)
+    console.log(d3.geoCentroid(selStateOnly[0]))
+    console.log(d3.geoBounds(selStateOnly[0]))
+
+    var projection = d3.geoAlbersUsa()
+		  .translate([  // translate to center of screen
+        d3.select("#state1_map_div").node().clientWidth / 2, 
+        d3.select("#state1_map_div").node().clientHeight / 2, 
+      ])
+		  .scale([500]); // scale things down to see entire US
+
     // Bind the data to the SVG and create one path per GeoJSON feature
     state1MapArea.selectAll("path")
-      .data(json.features)
+      .data(selStateOnly)
       .enter()
       .append("path")
         .attr("id", function(d) {return dataStateNameMappingsReversed[d.properties.name]})
@@ -559,12 +572,12 @@ function drawSecondMap() {
         .style("fill", function(d) { 
           var stateCode = dataStateNameMappingsReversed[d.properties.name];
           return myColorScale(dataByStatesRestricted[stateCode].length); 
-        });
+        })
+        .raise();
   
     var dataCities = new Array();
-    var st = "TX";  // TODO: do in general for any states
-    for (var key of dataCountByCitiesRestricted[st].keys()) {
-      var uniqueName = st + "_" + key; // name for indexing
+    for (var key of dataCountByCitiesRestricted[state].keys()) {
+      var uniqueName = state + "_" + key; // name for indexing
       var coordsObj = dataCityCoordMappings.get(uniqueName);
       
       // ignore few irrelevant cities without coords or inexact ones
@@ -574,7 +587,7 @@ function drawSecondMap() {
 
       dataCities.push({
         name: key, 
-        val: dataCountByCitiesRestricted[st].get(key), 
+        val: dataCountByCitiesRestricted[state].get(key), 
         lon: coordsObj["lon"], 
         lat: coordsObj["lat"]
       })
@@ -591,15 +604,15 @@ function drawSecondMap() {
         .style("fill", "rgb(0,0,0)")	
         .style("opacity", 0.85)	
       .on("mouseover", function(d) { // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
-        tooltipDiv.transition()        
+        state1MapToolTip.transition()        
           .duration(200)      
           .style("opacity", .9);      
-        tooltipDiv.text(d.name)
+          state1MapToolTip.text(d.name)
           .style("left", (d3.event.pageX) + "px")     
           .style("top", (d3.event.pageY - 28) + "px");    
       })                 
       .on("mouseout", function(d) { // fade out tooltip on mouse out     
-        tooltipDiv.transition()        
+        state1MapToolTip.transition()        
           .duration(500)      
           .style("opacity", 0);   
       });  
@@ -647,7 +660,6 @@ function drawPieChart(attribute, state) {
   var radius = Math.min(d3.select("#state1_pie_chart_div").node().clientWidth, d3.select("#state1_pie_chart_div").node().clientHeight) / 2 - 3;
 
   // build the pie chart: each part of the pie is a path that we build using the arc function
-  console.log(pieData)
   state1ChartArea
     .selectAll('whatever')
     .data(pieData)
@@ -717,7 +729,7 @@ function drawStateStats(state) {
     if (value > numCasesState) {
       rankStateAbs++;
     }
-    if (value == numCasesState) {
+    if (value == numCasesState && key != state) {
       sameNumCases++;
     }
   }
@@ -736,7 +748,6 @@ function drawStateStats(state) {
     .attrs({x: 0, y: 70})
     .text("Rank: " + rankStateAbs + sameNumCasesString);
 }
-
 
 
 /*----------------------
@@ -763,13 +774,13 @@ function mainMapClick(stateId) {
     //$( '.state-item:contains(' + dataStateNameMappings[stateId] + ')' ).removeClass('active');
 
     // redraw state chart (will remove chart)
-    drawPieChart(selectedAttribute, selectedState);
+    drawPieChart(selectedAttribute, null);
 
     // remove state stats
     state1StatsArea.text("");
 
-    // TODO: remove the state from the zoom area
-
+    // redraw state map (will remove map)
+    drawSecondMap(null);
   } else {
     // if some other state was selected before, unselect it first
     if (selectedState != null) {
@@ -780,7 +791,6 @@ function mainMapClick(stateId) {
       // unselect in the dropdown menu
       $(selectedStateButton).removeClass('active');
 
-      // TODO: remove the state from the zoom area
     }
     // remove the previous text (can be state name or "nothing selected" text) from the text area
     state1DropMenuArea.text("");
@@ -804,6 +814,8 @@ function mainMapClick(stateId) {
     drawPieChart(selectedAttribute, selectedState);
     // add state stats
     drawStateStats(selectedState);
+    // redraw state map (will remove old and add new version)
+    drawSecondMap(selectedState);
 
     console.log("Selected state:", dataStateNameMappings[selectedState]);
   }
@@ -815,7 +827,7 @@ INTERACTION WITH THE BUTTONS AND DROPDOWNS
 
 /* -------------- MONTH CHANGING -------------- */
 $("#select_month_btn").on("click", function(event){
-  console.log("You clicked the month drop down", event);
+  console.log("You clicked the month drop down");
 });
 
 $(document).on("click", ".month-item", function(event){  
@@ -849,7 +861,7 @@ $(document).on("click", ".month-item", function(event){
 
 /* -------------- YEAR CHANGING -------------- */
 $("#select_year_btn").on("click", function(event){
-  console.log("You clicked the year drop down", event);
+  console.log("You clicked the year drop down");
 });
 
 $(document).on("click", ".year-item", function(event){
@@ -906,7 +918,7 @@ $("#relative-numbers-button").on("click", function(event){
 
 /* -------------- STATE CHANGING -------------- */
 $("#state1_drop_menu_div").on("click", function(event){
-  console.log("You clicked the state1 drop down", event);
+  console.log("You clicked the state1 drop down");
 });
 
 $(document).on("click", ".state-item", function(event){
