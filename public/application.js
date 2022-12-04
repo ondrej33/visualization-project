@@ -548,15 +548,15 @@ function drawSecondMap(state) {
   d3.json("us-states.json", function(json) { 
     var selStateOnly = json.features.filter((d) => (dataStateNameMappingsReversed[d.properties.name] === state))
     console.log(selStateOnly)
-    console.log(d3.geoCentroid(selStateOnly[0]))
-    console.log(d3.geoBounds(selStateOnly[0]))
+    //console.log(d3.geoCentroid(selStateOnly[0]))
+    //console.log(d3.geoBounds(selStateOnly[0]))
 
     var projection = d3.geoAlbersUsa()
 		  .translate([  // translate to center of screen
         d3.select("#state1_map_div").node().clientWidth / 2, 
         d3.select("#state1_map_div").node().clientHeight / 2, 
       ])
-		  .scale([500]); // scale things down to see entire US
+		  .scale(d3.select("#state1_map_div").node().clientWidth); // scale things down to see entire US
 
     // Bind the data to the SVG and create one path per GeoJSON feature
     state1MapArea.selectAll("path")
@@ -573,8 +573,11 @@ function drawSecondMap(state) {
           var stateCode = dataStateNameMappingsReversed[d.properties.name];
           return myColorScale(dataByStatesRestricted[stateCode].length); 
         })
+        .on("click", clickedState)
         .raise();
-  
+      
+    d3.select('#state1_map_div').select("path").dispatch('click');
+     
     var dataCities = new Array();
     for (var key of dataCountByCitiesRestricted[state].keys()) {
       var uniqueName = state + "_" + key; // name for indexing
@@ -618,6 +621,40 @@ function drawSecondMap(state) {
       });  
   });
 }
+
+function clickedState(state) {
+  console.log(state)
+  console.log(d3.select("#state1_map_div").select("path"))
+  var width = d3.select("#state1_map_div").node().clientWidth;
+  var height = d3.select("#state1_map_div").node().clientHeight;
+
+  var projection = d3.geoAlbersUsa()
+    .translate([  // translate to center of screen
+      width / 2, 
+      height / 2, 
+    ])
+    .scale(width); // scale things down to see entire US
+  
+  var path = d3.geoPath().projection(projection);
+  console.log(path.bounds(state))
+  console.log(path.centroid(state))
+
+  var bounds = path.bounds(state),
+      dx = bounds[1][0] - bounds[0][0],
+      dy = bounds[1][1] - bounds[0][1],
+      x = (bounds[0][0] + bounds[1][0]) / 2,
+      y = (bounds[0][1] + bounds[1][1]) / 2,
+      //scale = .9 / Math.max(dx / width, dy / height),
+      //translate = [width / 2 - scale * x, height / 2 - scale * y];
+      scale = 1,
+      translate = [ width / 2 - x, height / 2 - y];
+
+  state1MapArea.transition()
+      .duration(0) // instant
+      .style("stroke-width", 1.5 / scale + "px")
+      .attr("transform", "translate(" + translate + ")scale(" + scale + ")");
+}
+
 
 /*----------------------
 DRAW PIE CHART 
