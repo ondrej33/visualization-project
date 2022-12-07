@@ -539,6 +539,16 @@ function drawSecondMap(state) {
   d3.select("#state1_map_div").select('svg').html("");
   d3.select("#state1_map_div").select('.tooltip').html("");
 
+  // Add a clipPath: everything out of this area won't be drawn.
+  state1MapArea.append("defs").append("clipPath")
+    .attr("id", "clip")
+    .append("rect")
+    .attr("width", d3.select("#state1_map_div").node().clientWidth )
+    .attr("height", d3.select("#state1_map_div").node().clientHeight )
+    .attr("x", 0)
+    .attr("y", 0);
+
+
   // if no state selected, return
   if (state == null) {
     return;
@@ -547,9 +557,6 @@ function drawSecondMap(state) {
   // Load GeoJSON data and merge with states data
   d3.json("us-states.json", function(json) { 
     var selStateOnly = json.features.filter((d) => (dataStateNameMappingsReversed[d.properties.name] === state))
-    console.log(selStateOnly)
-    //console.log(d3.geoCentroid(selStateOnly[0]))
-    //console.log(d3.geoBounds(selStateOnly[0]))
 
     var projection = d3.geoAlbersUsa()
 		  .translate([  // translate to center of screen
@@ -558,8 +565,13 @@ function drawSecondMap(state) {
       ])
 		  .scale(d3.select("#state1_map_div").node().clientWidth); // scale things down to see entire US
 
+    // add map to svg using an inner 'g' element (cant be added directly, would mess the clip obj)
+    var state1Map = state1MapArea.append('g')
+      .attr("id", "map-g")
+      .attr("clip-path", "url(#clip)")
+
     // Bind the data to the SVG and create one path per GeoJSON feature
-    state1MapArea.selectAll("path")
+    state1Map.selectAll("path")
       .data(selStateOnly)
       .enter()
       .append("path")
@@ -576,8 +588,10 @@ function drawSecondMap(state) {
         .on("click", clickedState)
         .raise();
       
+    // zoom to the area using 'fake' click function
     d3.select('#state1_map_div').select("path").dispatch('click');
      
+    // get the cities to add and their coordinates
     var dataCities = new Array();
     for (var key of dataCountByCitiesRestricted[state].keys()) {
       var uniqueName = state + "_" + key; // name for indexing
@@ -596,8 +610,8 @@ function drawSecondMap(state) {
       })
     }
     
-    // Map the cities 
-    state1MapArea.selectAll("circle")
+    // Map the cities, the size of each circle corresponds to the sqrt of number of its cases
+    state1Map.selectAll("circle")
       .data(dataCities)
       .enter()
       .append("circle")
@@ -623,8 +637,6 @@ function drawSecondMap(state) {
 }
 
 function clickedState(state) {
-  console.log(state)
-  console.log(d3.select("#state1_map_div").select("path"))
   var width = d3.select("#state1_map_div").node().clientWidth;
   var height = d3.select("#state1_map_div").node().clientHeight;
 
@@ -636,20 +648,18 @@ function clickedState(state) {
     .scale(width); // scale things down to see entire US
   
   var path = d3.geoPath().projection(projection);
-  console.log(path.bounds(state))
-  console.log(path.centroid(state))
 
   var bounds = path.bounds(state),
       dx = bounds[1][0] - bounds[0][0],
       dy = bounds[1][1] - bounds[0][1],
       x = (bounds[0][0] + bounds[1][0]) / 2,
       y = (bounds[0][1] + bounds[1][1]) / 2,
-      //scale = .9 / Math.max(dx / width, dy / height),
-      //translate = [width / 2 - scale * x, height / 2 - scale * y];
-      scale = 1,
-      translate = [ width / 2 - x, height / 2 - y];
+      scale = .8 / Math.max(dx / width, dy / height),
+      //translate = [(scale * width) / 2 - scale * x, (scale * width) / 2 - scale * y];
+      translate = [(width) / 2 - scale * x, (height) / 2 - scale * y];
 
-  state1MapArea.transition()
+  state1Map = d3.select("#state1_map_div").select("#map-g");
+  state1Map.transition()
       .duration(0) // instant
       .style("stroke-width", 1.5 / scale + "px")
       .attr("transform", "translate(" + translate + ")scale(" + scale + ")");
