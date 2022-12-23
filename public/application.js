@@ -322,15 +322,29 @@ function addDropDownOptions() {
     dropDownMenu.append($('<a class="dropdown-item year-item">' + i + '</a>'));
   }
 
-  // state dropdown
-  var dropDownMenu = $('#select_state_menu');
-  // add the state names sorted
+  // state dropdown with 6 sub-dropdowns (A-D, F-K, L-M, N, O-T, U-W)
   var listStates = [];
+  // collect and sort the state names first
   for (var key in dataStateNameMappings) {
     listStates.push(dataStateNameMappings[key]);
   }
   listStates.sort();
+  // now add them to their respective sub-dropdowns
+  dropDownMenu = $('#state-container-AD');
   for (var s of listStates) {
+    // if we already added all states from given range, update the sub-dropdown
+    if (s.startsWith('F')) {
+      dropDownMenu = $('#state-container-FK');
+    } else if (s.startsWith('L')) {
+      dropDownMenu = $('#state-container-LM');
+    } else if (s.startsWith('N')) {
+      dropDownMenu = $('#state-container-N');
+    } else if (s.startsWith('O')) {
+      dropDownMenu = $('#state-container-OT');
+    } else if (s.startsWith('U')) {
+      dropDownMenu = $('#state-container-UW');
+    }
+
     dropDownMenu.append($('<a class="dropdown-item state-item">' + s + '</a>'));
   }
 
@@ -611,13 +625,19 @@ function drawSecondMap(state) {
     }
     
     // Map the cities, the size of each circle corresponds to the sqrt of number of its cases
+
+    // for DC, the circle size must be made synthetically smaller because of scale problems
+    var max_radius = 1000;
+    if (state == "DC") { 
+      max_radius = 0.5;
+    }
     state1Map.selectAll("circle")
       .data(dataCities)
       .enter()
       .append("circle")
         .attr("cx", function(d) { return projection([d.lon, d.lat])[0]; })
         .attr("cy", function(d) { return projection([d.lon, d.lat])[1]; })
-        .attr("r", function(d) { return Math.sqrt(d.val); })
+        .attr("r", function(d) { return Math.min(Math.log(d.val + 1), max_radius); })
         .style("fill", "rgb(0,0,0)")	
         .style("opacity", 0.85)	
       .on("mouseover", function(d) { // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
@@ -1011,3 +1031,31 @@ $(document).on("click", ".attrib-item", function(event){
     console.log("Selected attribute: " + target.text);
   }
 });
+
+// 6 state selection sub-dropdowns (A-D, F-K, L-M, N, O-T, U-W)
+$('#state-container-btn-AD').on("mouseenter", function() {
+  $(".state-container").removeClass("show");
+  $("#state-container-AD").addClass("show");
+});
+$('#state-container-btn-FK').on("mouseenter", function() {
+  $(".state-container").removeClass("show");
+  $("#state-container-FK").addClass("show");
+});
+$('#state-container-btn-LM').on("mouseenter", function() {
+  $(".state-container").removeClass("show");
+  $("#state-container-LM").addClass("show");
+});
+$('#state-container-btn-N').on("mouseenter", function() {
+  $(".state-container").removeClass("show");
+  $("#state-container-N").addClass("show");
+});
+$('#state-container-btn-OT').on("mouseenter", function() {
+  $(".state-container").removeClass("show");
+  $("#state-container-OT").addClass("show");
+});
+$('#state-container-btn-UW').on("mouseenter", function() {
+  $(".state-container").removeClass("show");
+  $("#state-container-UW").addClass("show");
+});
+
+
