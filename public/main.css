@@ -83,7 +83,6 @@ body{
   width: 100%;
   height: 10vh;
   float: left;
-  padding-left: 20px;
 }
 
 .state_drop_menu{
@@ -116,7 +115,24 @@ body{
   float: left;
 }
 
-.headline, .subline{
+#victim_list_div{
+  width: 100%;
+  height: 80vh;
+  float: left;
+  margin: auto;
+  padding-left: 10%;
+  padding-right: 10%;
+}
+
+#victim_list{
+  width: 100%;
+  height: 60vh;
+  margin: auto;
+  float: left;
+  background:#e0eaff;
+}
+
+.headline, .subline, .description-font{
   display: block;
   margin-top: 0.67em;
   margin-bottom: 0.67em;
@@ -124,7 +140,7 @@ body{
   margin-right: 0;
   fill: rgb(0, 0, 0);
   font-family: 'PT Sans',sans-serif;
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
 .headline{
@@ -137,10 +153,9 @@ body{
   font-weight: thick;
 }
 
-.label{
-  font-family: 'PT Sans',sans-serif;
-  opacity: 1;
-  font-size: 30%;
+.description-font{
+  font-weight: 600;
+  font-size: 150%;
 }
 
 .dropdown-menu .dropdown-item:active,

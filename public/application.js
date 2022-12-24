@@ -33,12 +33,8 @@ var state1MapToolTip;
 var state1DropMenuArea;
 var state1StatsArea;
 var state1ChartArea;
-var state2MapArea;
-var state2MapToolTip;
-var state2DropMenuArea;
-var state2StatsArea;
-var state2ChartArea;
 var statesAttributesMenuArea;
+var victimListDescriptionArea;
 
 /* variables for current selection */
 var selectedState;
@@ -65,7 +61,7 @@ d3.csv("./public/us_police_shootings_dataset.csv")
   .row(function (d) {
     return {
       //id: +d["id"],
-      //name: d["name"],
+      name: d["name"],
       date: new Date(d["date"]),
       manner_of_death: d["manner_of_death"],
       armed_with: d["armed"],
@@ -299,8 +295,14 @@ function init() {
     .append("g")
       .attr("transform", "translate(" + halfWidth + "," + halfHeight + ")");
 
-  // title stays always the same, just add it once now
+  // victim list description
+  victimListDescriptionArea = d3.select("#victim_upper").append("svg")
+    .attr("width", d3.select("#victim_upper").node().clientWidth)
+    .attr("height", d3.select("#victim_upper").node().clientHeight);
+
+  // title and descriptions stay always the same, just add it once now
   drawTitle();
+  drawVictimListDescriptions();
 
   // initial text for selected state
   state1DropMenuArea.append("text")
@@ -424,16 +426,26 @@ function visualization() {
   drawPieChart(selectedAttribute, selectedState);
   drawStateStats(selectedState);
   drawSecondMap(selectedState);
+  drawVictimList();
 }
 
 /*----------------------
-TITLE
+TITLE AND DESCRIPTIONS
 ----------------------*/
 function drawTitle() {
   //Draw headline
   titleArea.append("text")
-    .attrs({ dx: d3.select("#title_div").node().clientWidth / 5, dy: "2em", class: "headline" })
+    .attrs({ dx: d3.select("#title_div").node().clientWidth / 8, dy: "2em", class: "headline" })
     .text("Police Shootings in the US");
+}
+
+function drawVictimListDescriptions() {
+  victimListDescriptionArea.append("text")
+    .attrs({ dx: d3.select("#victim_upper").node().clientWidth / 10, dy: "1em", class: "description-font"})
+    .text("People shot in the selected area and time");
+  victimListDescriptionArea.append("text")
+    .attrs({ dx: d3.select("#victim_upper").node().clientWidth / 10, dy: "3em", opacity: 0.7})
+    .text("(up to 1000 people displayed)");
 }
 
 /*----------------------
@@ -690,7 +702,7 @@ function clickedState(state) {
 DRAW PIE CHART 
 ----------------------*/
 function drawPieChart(attribute, state) {
-  console.log("Pie chart for:",attribute, state)
+  console.log("Pie chart for:", attribute, state)
   // remove current visualization if some exists
   d3.select("#state1_pie_chart_div").select('svg').select('g').html("")
 
@@ -848,6 +860,7 @@ function mainMapClick(stateId) {
 
     // redraw state map (will remove map)
     drawSecondMap(null);
+    drawVictimList();
   } else {
     // if some other state was selected before, unselect it first
     if (selectedState != null) {
@@ -883,8 +896,40 @@ function mainMapClick(stateId) {
     drawStateStats(selectedState);
     // redraw state map (will remove old and add new version)
     drawSecondMap(selectedState);
+    drawVictimList();
 
     console.log("Selected state:", dataStateNameMappings[selectedState]);
+  }
+}
+
+/*----------------------
+DRAWING THE VICTIM LIST
+----------------------*/
+
+async function drawVictimList() {
+  var data = [];
+  // we already have month and year restrictions present, but we must filter by state (if selected)
+  if (selectedState != null) {
+    data = dataByStatesRestricted[selectedState];
+  } else {
+    for (s in dataByStatesRestricted) {
+      data = data.concat(dataByStatesRestricted[s]);
+      if (data.length > 1000) {
+        break;
+      }  
+    }
+  }
+
+  // add the data to scrollable dropdown
+  victimList = $("#victim_list");
+  victimList.text("");
+  var i = 0;
+  for (shootingCase in data) {
+    if (i == 1000) {
+      break;
+    }
+    i++;
+    victimList.append($('<a class="dropdown-item victim-item">' + data[shootingCase].name + '</a>'))
   }
 }
 
@@ -1032,7 +1077,8 @@ $(document).on("click", ".attrib-item", function(event){
   }
 });
 
-// 6 state selection sub-dropdowns (A-D, F-K, L-M, N, O-T, U-W)
+/* -------------- STATE SELECTION SUB-DROPDOWNS -------------- */
+// There are 6 sub-dropdowns forstate selection (A-D, F-K, L-M, N, O-T, U-W)
 $('#state-container-btn-AD').on("mouseenter", function() {
   $(".state-container").removeClass("show");
   $("#state-container-AD").addClass("show");
