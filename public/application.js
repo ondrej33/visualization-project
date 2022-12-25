@@ -445,7 +445,7 @@ function drawVictimListDescriptions() {
     .text("People shot in the selected area and time");
   victimListDescriptionArea.append("text")
     .attrs({ dx: d3.select("#victim_upper").node().clientWidth / 10, dy: "3em", opacity: 0.7})
-    .text("(up to 1000 people displayed)");
+    .text("(up to 100 people displayed)");
 }
 
 /*----------------------
@@ -543,6 +543,19 @@ function drawUsMapStats() {
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 150})
     .text("Median per state: " + medianValue);
+
+  // note for 2022 about missing data
+  if (selectedYear == "2022") {
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 190})
+      .style("fill", "red")
+      .text("For 2022, data are incomplete.");
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 210})
+      .style("fill", "red")
+      .text("Data regarding Oct-Dec are missing.");
+  }
+
 }
 
 /*----------------------
@@ -582,7 +595,7 @@ function drawSecondMap(state) {
           
   // Load GeoJSON data and merge with states data
   d3.json("us-states.json", function(json) { 
-    var selStateOnly = json.features.filter((d) => (dataStateNameMappingsReversed[d.properties.name] === state))
+    var listSelectedStateOnly = json.features.filter((d) => (dataStateNameMappingsReversed[d.properties.name] === state))
 
     var projection = d3.geoAlbersUsa()
 		  .translate([  // translate to center of screen
@@ -598,7 +611,7 @@ function drawSecondMap(state) {
 
     // Bind the data to the SVG and create one path per GeoJSON feature
     state1Map.selectAll("path")
-      .data(selStateOnly)
+      .data(listSelectedStateOnly)
       .enter()
       .append("path")
         .attr("id", function(d) {return dataStateNameMappingsReversed[d.properties.name]})
@@ -643,6 +656,7 @@ function drawSecondMap(state) {
     if (state == "DC") { 
       max_radius = 0.5;
     }
+    
     state1Map.selectAll("circle")
       .data(dataCities)
       .enter()
@@ -654,15 +668,27 @@ function drawSecondMap(state) {
         .style("opacity", 0.85)	
       .on("mouseover", function(d) { // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
         state1MapToolTip.transition()        
-          .duration(200)      
-          .style("opacity", .9);      
-          state1MapToolTip.text(d.name)
+          .duration(100)      
+          .style("opacity", 1);   
+        state1MapToolTip.text(function() { 
+          // compute number of cases in the city
+          cityName = d.name
+          stateCode = dataStateNameMappingsReversed[listSelectedStateOnly[0].properties.name];
+          dataCity = dataByStatesRestricted[stateCode].filter(shootingCase => shootingCase.city == cityName);
+          return cityName + ": " + dataCity.length;
+        })
+          .style("font-size", "110%")
+          .style("background-color", function() { 
+            // same background color as is the state color
+            stateCode = dataStateNameMappingsReversed[listSelectedStateOnly[0].properties.name];
+            return myColorScale(dataByStatesRestricted[stateCode].length);
+          })
           .style("left", (d3.event.pageX) + "px")     
           .style("top", (d3.event.pageY - 28) + "px");    
       })                 
-      .on("mouseout", function(d) { // fade out tooltip on mouse out     
+      .on("mouseout", function() { // fade out tooltip on mouse out     
         state1MapToolTip.transition()        
-          .duration(500)      
+          .duration(200)      
           .style("opacity", 0);   
       });  
   });
@@ -914,7 +940,7 @@ async function drawVictimList() {
   } else {
     for (s in dataByStatesRestricted) {
       data = data.concat(dataByStatesRestricted[s]);
-      if (data.length > 1000) {
+      if (data.length > 100) {
         break;
       }  
     }
@@ -925,7 +951,7 @@ async function drawVictimList() {
   victimList.text("");
   var i = 0;
   for (shootingCase in data) {
-    if (i == 1000) {
+    if (i == 100) {
       break;
     }
     i++;
