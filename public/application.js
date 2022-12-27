@@ -600,10 +600,14 @@ function drawSecondMap(state) {
     .attr("y", 0);
 
 
-  // if no state selected, return
+  // if no state selected, remove attribute menu and return
   if (state == null) {
+    $("#select_attrib_menu").removeClass("show");
     return;
   }
+
+  // make attribute menu visible
+  $("#select_attrib_menu").addClass("show");
           
   // Load GeoJSON data and merge with states data
   d3.json("us-states.json", function(json) { 
@@ -808,6 +812,7 @@ function drawPieChart(attribute, state) {
 
   var labelHeight = 18;
 
+  // add the legend
   legend = state1ChartArea
     .append('g')
     .attr('transform', `translate(${radius  + 20},0)`);
