@@ -22,6 +22,8 @@ var dataDisplayedAttribs;
 var dataMonthNameMappings;
 // month name to number mappings
 var dataMonthNameMappingsReversed;
+// population by states
+var dataPopulationByState;
 
 
 /* D3.js canvases */
@@ -55,6 +57,7 @@ var selectedAttributeButton;
 var numStates = 51;
 var myColorScale;
 var highestAbsVal;
+var highestRelVal;
 
 /* Loading the main data from CSV file */
 d3.csv("./public/us_police_shootings_dataset.csv")
@@ -187,13 +190,28 @@ d3.csv("./public/us_police_shootings_dataset.csv")
       dataMonthNameMappingsReversed = {};
       for (var key in dataMonthNameMappings){
         dataMonthNameMappingsReversed[dataMonthNameMappings[key]] = key;
-      }      
-    
-      //load map and initialise the views
-      init();
+      } 
 
-      // data visualization
-      visualization();
+      // retrieve population data
+      d3.csv("./public/us_population.csv")
+      .row(function (d) {
+        return {
+          stateCode: dataStateNameMappingsReversed[d["Geographic Area Name (NAME)"]],
+          population: +(d["Estimates Base Population, April 1, 2020 (POP_BASE2020)"].replace(",","").replace(",","")) // up to 2 commas
+        }
+      })
+      .get(function (error, rows) {
+        dataPopulationByState = new Map();
+        for (r of rows) {
+          dataPopulationByState.set(r["stateCode"], r["population"]);
+        }
+
+        //load map and initialise the views
+        init();
+
+        // data visualization
+        visualization();
+      });
     });  
 });
 
@@ -245,6 +263,7 @@ function init() {
       let map = d3.select("body").select("#map");
       map.selectAll("path")
         .style("fill", function() { // fill states using the defined gradient
+          // default mode is Absolute, so we dont have to check it
           return myColorScale(dataByStatesRestricted[this.id].length); 
         })
         .style("stroke", "grey")
@@ -253,7 +272,7 @@ function init() {
           mainMapClick(this.id);
         });
     });
-  
+      
   // d3 canvases for svg elements
   // title
   titleArea = d3.select("#title_div").append("svg")
@@ -285,15 +304,15 @@ function init() {
     .attr("height", d3.select("#state1_stats_div").node().clientHeight)
 
   // zoom state1 chart
-  // translate moves it to the middle of div
-  var halfWidth = d3.select("#state1_pie_chart_div").node().clientWidth / 2;
-  var halfHeight = d3.select("#state1_pie_chart_div").node().clientHeight / 2;
+  // use "translate" to make the central point 1/3 from left and 1/2 from bottom
+  var centerWidth = d3.select("#state1_pie_chart_div").node().clientWidth / 3;
+  var centerHeight = d3.select("#state1_pie_chart_div").node().clientHeight / 2;
   state1ChartArea = d3.select("#state1_pie_chart_div")
     .append("svg")
       .attr("width", d3.select("#state1_pie_chart_div").node().clientWidth)
       .attr("height", d3.select("#state1_pie_chart_div").node().clientHeight)
     .append("g")
-      .attr("transform", "translate(" + halfWidth + "," + halfHeight + ")");
+      .attr("transform", "translate(" + centerWidth + "," + centerHeight + ")");
 
   // victim list description
   victimListDescriptionArea = d3.select("#victim_upper").append("svg")
@@ -370,10 +389,16 @@ function precomputeData() {
   divideDataToStates(selectedYear, selectedMonth);
 
   // compute the highest number of shooting in a state
-  highestAbsVal = computeHighestAbsVal();
+  highestValues = computeHighestValues();
+  highestAbsVal = highestValues[0];
+  highestRelVal = highestValues[1];
     
   // initialize color scale
-  myColorScale = d3.scaleSequential().domain([0, highestAbsVal]).interpolator(d3.interpolateYlOrRd);
+  if (selectedMode == "Abs") {
+    myColorScale = d3.scaleSequential().domain([0, highestAbsVal]).interpolator(d3.interpolateYlOrRd);
+  } else {
+    myColorScale = d3.scaleSequential().domain([0, highestRelVal]).interpolator(d3.interpolateYlOrRd);
+  }
 }
 
 function divideDataToStates(year, month) {
@@ -406,14 +431,20 @@ function divideDataToStates(year, month) {
   }
 }
 
-function computeHighestAbsVal() {
-  topValue = 0;
+// compute both absolute and relative (per 1 mil) highest values
+function computeHighestValues() {
+  topAbsValue = 0;
+  topRelValue = 0;
   for (var key in dataByStatesRestricted) {
-    if (dataByStatesRestricted[key].length > topValue) {
-      topValue = dataByStatesRestricted[key].length;
+    if (dataByStatesRestricted[key].length > topAbsValue) {
+      topAbsValue = dataByStatesRestricted[key].length;
+    }
+    var relPopulation = (dataByStatesRestricted[key].length / dataPopulationByState.get(key)) * 1_000_000;
+    if (relPopulation > topRelValue) {
+      topRelValue = relPopulation;
     }
   }
-  return topValue;
+  return [topAbsValue, topRelValue];
 }
 
 
@@ -435,7 +466,7 @@ TITLE AND DESCRIPTIONS
 function drawTitle() {
   //Draw headline
   titleArea.append("text")
-    .attrs({ dx: d3.select("#title_div").node().clientWidth / 8, dy: "2em", class: "headline" })
+    .attrs({ dx: d3.select("#title_div").node().clientWidth / 10, dy: "2em", class: "headline" })
     .text("Police Shootings in the US");
 }
 
@@ -471,90 +502,159 @@ function drawUsMapStats() {
     .attr('offset', "0%") //starting color
     .attr("stop-color", myColorScale(0));
 
-  gradient.append("stop")
-    .attr('offset', "50%") //middle color
-    .attr("stop-color",  myColorScale(highestAbsVal / 2));
+  // mid and end stops depend on selected mode
+  if (selectedMode == "Abs") {
+    gradient.append("stop")
+      .attr('offset', "50%") // middle color
+      .attr("stop-color",  myColorScale(highestAbsVal / 2));
     
-  gradient.append("stop")
-    .attr('offset', "100%") //end color
-    .attr("stop-color",  myColorScale(highestAbsVal));
-
+    gradient.append("stop")
+      .attr('offset', "100%") // end color
+      .attr("stop-color",  myColorScale(highestAbsVal));
+  } else {
+    gradient.append("stop")
+      .attr('offset', "50%") // middle color
+      .attr("stop-color",  myColorScale(highestRelVal / 2));
+    
+    gradient.append("stop")
+      .attr('offset', "100%") // end color
+      .attr("stop-color",  myColorScale(highestRelVal));
+  }
+    
   // append rectangle with gradient fill  
   usMapStatsArea.append('rect').attrs({ 
     x: 0, 
     y: usMapStatsArea.node().clientHeight - 30, 
-    width: usMapStatsArea.node().clientWidth * 0.6, 
+    width: usMapStatsArea.node().clientWidth * 0.7, 
     height: 18, 
     stroke: 'white',
     fill: 'url(#svgGradient)' //gradient color fill is set as url to svg gradient element
   }).style("stroke-width", 3);
 
-  // min and max labels
+  // min + max labels, description of the gradient
+  // min label is 0 for both modes, other two depend on relative/absolute mode
   usMapStatsArea.append("text")
-    .attrs({x: 0, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
+    .attrs({x: 0, y: usMapStatsArea.node().clientHeight - 36, class: "subline"})
     .text(0);
-  usMapStatsArea.append("text")
-    .attrs({x: usMapStatsArea.node().clientWidth * 0.6, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
-    .attr("text-anchor", "end")
-    .text(highestAbsVal);
-
-  // Description of displayed values
-  // TODO: change if relative view selected
-  usMapStatsArea.append("text")
-    .attrs({x: usMapStatsArea.node().clientWidth * 0.3, y: usMapStatsArea.node().clientHeight - 40, class: "subline"})
-    .attr("text-anchor", "middle")
-    .text("Number of people killed");
-
+  if (selectedMode == "Abs") {
+    usMapStatsArea.append("text")
+      .attrs({x: usMapStatsArea.node().clientWidth * 0.7, y: usMapStatsArea.node().clientHeight - 36, class: "subline"})
+      .attr("text-anchor", "end")
+      .text(highestAbsVal);
+    usMapStatsArea.append("text")
+      .attrs({x: usMapStatsArea.node().clientWidth * 0.35, y: usMapStatsArea.node().clientHeight - 40, class: "subline"})
+      .attr("text-anchor", "middle")
+      .text("Number of people killed");
+  } else {
+    usMapStatsArea.append("text")
+      .attrs({x: usMapStatsArea.node().clientWidth * 0.7, y: usMapStatsArea.node().clientHeight - 36, class: "subline"})
+      .attr("text-anchor", "end")
+      .text(highestRelVal.toFixed(2));
+    usMapStatsArea.append("text")
+      .attrs({x: usMapStatsArea.node().clientWidth * 0.35, y: usMapStatsArea.node().clientHeight - 40, class: "subline"})
+      .attr("text-anchor", "middle")
+      .text("Number of killed per million people");
+  }
 
   // Compute and display some stats
+
+  // description heading
+  textToAdd = "";
+  if (selectedMode == "Abs") {
+    textToAdd = "Number of shootings across states";
+  } else {
+    textToAdd = "Number of shootings per million people"
+  }
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 40})
-    .text("Number of shootings across states")
+    .text(textToAdd)
     .style("font-size", "140%");
 
   // compute min, sum, average and mid, ... values first
-  var minValue = 1000000; // some large value
+  var minValue = 1_000_000; // some large value
+  var minRelValue = 1_000_000.; // some large value
   var sumValue = 0.;
-  var medianValue = 0;
-  var midIndex = Math.floor(numStates / 2);
+  var totalPopulation = 0;
+  var arrayValues = [];
+  var arrayRelValues = [];
+  // highest vals are already precomputed
+
   var i = 0;
   for (var key in dataByStatesRestricted) {
     value = dataByStatesRestricted[key].length;
+    pop = dataPopulationByState.get(key);
+    relValue = value / pop * 1_000_000;
+
+    arrayValues.push(value);
+    arrayRelValues.push(relValue);
+
     sumValue += value;
-    if (i == midIndex) {
-      medianValue = value;
-    }
+    totalPopulation += pop;
+
     if (value < minValue) {
       minValue = value;
     }
+    if (relValue < minRelValue) {
+      minRelValue = relValue;
+    }
     i++;
   }
+
   var averageValue = sumValue / 51;
+
+  var midIndex = Math.floor(numStates / 2);
+  arrayValues.sort();
+  arrayRelValues.sort();
+  var medianValue = arrayValues[midIndex];
+  var medianRelValue = arrayRelValues[midIndex];
   
-  // total number of cases
-  usMapStatsArea.append("text")
-    .attrs({x: 0, y: 70})
-    .text("Total: " + sumValue);
+  if (selectedMode == "Abs") {
+    // total number of cases
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 70})
+      .text("Total: " + sumValue);
   
-  // highest number of cases per state
-  usMapStatsArea.append("text")
-    .attrs({x: 0, y: 90})
-    .text("Highest: " + highestAbsVal);
+    // highest number of cases per state
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 90})
+      .text("Highest: " + highestAbsVal);
 
-  // least number of cases per state
-  usMapStatsArea.append("text")
-    .attrs({x: 0, y: 110})
-    .text("Lowest: " + minValue);
+    // least number of cases per state
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 110})
+      .text("Lowest: " + minValue);
 
-  // average number of cases per state
-  usMapStatsArea.append("text")
-    .attrs({x: 0, y: 130})
-    .text("Average: " + averageValue.toFixed(2));
+    // median number of cases per state
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 130})
+      .text("Median: " + medianValue);
 
-  // median number of cases per state
-  usMapStatsArea.append("text")
-    .attrs({x: 0, y: 150})
-    .text("Median: " + medianValue);
+    // average number of cases per state
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 150})
+      .text("Average: " + averageValue.toFixed(2));
+
+  } else {
+    // overall relative number of cases
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 70})
+      .text("Over whole US: " + (sumValue / totalPopulation * 1_000_000).toFixed(2));
+  
+    // highest number of cases per state
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 90})
+      .text("Highest: " + highestRelVal.toFixed(2));
+
+    // least number of cases per state
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 110})
+      .text("Lowest: " + minRelValue.toFixed(2));
+
+    // median number of cases per state
+    usMapStatsArea.append("text")
+      .attrs({x: 0, y: 130})
+      .text("Median: " + medianRelValue.toFixed(2));
+  }
 
   // note for 2022 about missing data
   if (selectedYear == "2022") {
@@ -567,7 +667,6 @@ function drawUsMapStats() {
       .style("fill", "red")
       .text("Data regarding Oct-Dec are missing.");
   }
-
 }
 
 /*----------------------
@@ -576,8 +675,15 @@ COLOR THE MAIN MAP
 function colorMap() {
   // set the state color corresponding to the number of cases
   for (var key in dataStateNameMappings) {
-    var color = myColorScale(dataByStatesRestricted[key].length);
-    d3.select('path#'+key).style("fill", color);
+    // depends on relative/absolute mode
+    if (selectedMode == "Abs") {
+      var color = myColorScale(dataByStatesRestricted[key].length);
+      d3.select('path#'+key).style("fill", color);  
+    } else {
+      var relPopulation = dataByStatesRestricted[key].length / dataPopulationByState.get(key) * 1_000_000;
+      var color = myColorScale(relPopulation);
+      d3.select('path#'+key).style("fill", color);  
+    }
   }
 }
 
@@ -649,7 +755,13 @@ function drawSecondMap(state) {
         .style("stroke-width", strokeWidth)
         .style("fill", function(d) { 
           var stateCode = dataStateNameMappingsReversed[d.properties.name];
-          return myColorScale(dataByStatesRestricted[stateCode].length); 
+          // color depends on mode (relative vs absolute)
+          if (selectedMode == "Abs") {
+            return myColorScale(dataByStatesRestricted[stateCode].length); 
+          } else {
+            relPopulation = dataByStatesRestricted[stateCode].length / dataPopulationByState.get(stateCode) * 1_000_000;
+            return myColorScale(relPopulation); 
+          }
         })
         .on("click", clickedState)
         .raise();
@@ -699,7 +811,7 @@ function drawSecondMap(state) {
         .style("opacity", 0.95)	
       .on("mouseover", function(d) { // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
         state1MapToolTip.transition()        
-          .duration(100)      
+          .duration(10)      
           .style("opacity", 1);   
         state1MapToolTip.text(function() { 
           // compute number of cases in the city
@@ -708,18 +820,24 @@ function drawSecondMap(state) {
           dataCity = dataByStatesRestricted[stateCode].filter(shootingCase => shootingCase.city == cityName);
           return cityName + ": " + dataCity.length;
         })
-          .style("font-size", "110%")
+          .style("font-size", "115%")
+          .style("color", "black")
           .style("background-color", function() { 
-            // same background color as is the state color
+            // same background color as is the state color (depends on selected mode - abs/rel)
             stateCode = dataStateNameMappingsReversed[listSelectedStateOnly[0].properties.name];
-            return myColorScale(dataByStatesRestricted[stateCode].length);
+            if (selectedMode == "Abs") {
+              return myColorScale(dataByStatesRestricted[stateCode].length); 
+            } else {
+              relPopulation = dataByStatesRestricted[stateCode].length / dataPopulationByState.get(stateCode) * 1_000_000;
+              return myColorScale(relPopulation); 
+            }
           })
           .style("left", (d3.event.pageX) + "px")     
           .style("top", (d3.event.pageY - 28) + "px");    
       })                 
       .on("mouseout", function() { // fade out tooltip on mouse out     
         state1MapToolTip.transition()        
-          .duration(200)      
+          .duration(10)      
           .style("opacity", 0);   
       });  
   });
@@ -859,32 +977,50 @@ function drawStateStats(state) {
   // compute some numbers first
   var casesState = dataByStatesRestricted[state];
   var numCasesState = casesState.length;
+  var relNumCasesState = numCasesState / dataPopulationByState.get(state) * 1_000_000;
   var rankStateAbs = 1; // rank can be in some range, if more states have same value
-  var sameNumCases = 0;
+  var rankStateRel = 1;
+  var sameNumCasesAbs = 0;
+  var sameNumCasesRel = 0;
 
   for (var key in dataByStatesRestricted) {
     value = dataByStatesRestricted[key].length;
+    relValue = value / dataPopulationByState.get(key) * 1_000_000;
+
     if (value > numCasesState) {
       rankStateAbs++;
     }
     if (value == numCasesState && key != state) {
-      sameNumCases++;
+      sameNumCasesAbs++;
+    }
+
+    if (relValue > relNumCasesState) {
+      rankStateRel++;
+    }
+    if (relValue == relNumCasesState && key != state) {
+      sameNumCasesRel++;
     }
   }
   
-  // total number of cases in state
+  var sameNumCasesString = "";
+  if (sameNumCasesAbs > 0) {
+    sameNumCasesString = " - " + (rankStateAbs + sameNumCasesAbs);
+  }
+
+  var sameNumCasesStringRel = "";
+  if (sameNumCasesRel > 0) {
+    sameNumCasesStringRel = " - " + (rankStateRel + sameNumCasesRel);
+  }
+
+  // total number of cases in state including the rank
   state1StatsArea.append("text")
     .attrs({x: 0, y: 50})
-    .text("Number of cases: " + numCasesState);
-  
-  // rank of the state (1 = highest)
-  var sameNumCasesString = "";
-  if (sameNumCases > 0) {
-    sameNumCasesString = " - " + (rankStateAbs + sameNumCases);
-  }
+    .text("Number of cases: " + numCasesState + " (ranked " + + rankStateAbs + sameNumCasesString + ")");
+
+  // relative number of cases in state
   state1StatsArea.append("text")
     .attrs({x: 0, y: 70})
-    .text("State rank: " + rankStateAbs + sameNumCasesString);
+    .text("Number of cases per 1 mil: " + relNumCasesState.toFixed(2) + " (ranked " + rankStateRel + sameNumCasesStringRel + ")");
 }
 
 
@@ -1074,7 +1210,10 @@ $("#absolute-numbers-button").on("click", function(event){
   if (selectedMode != "Abs") {
     selectedMode = "Abs";
     console.log("Selected mode: Absolute");
-    // TODO: update the numbers and map
+
+    // update the numbers and map (needs to be done after both selection & unselection)
+    precomputeData();
+    visualization();
   } else {
     // no need to change anything
     console.log("Selected mode: Absolute (no change)");
@@ -1085,7 +1224,10 @@ $("#relative-numbers-button").on("click", function(event){
   if (selectedMode != "Rel") {
     selectedMode = "Rel";
     console.log("Selected mode: Relative");
-    // TODO: update the numbers and map
+    
+    // update the numbers and map (needs to be done after both selection & unselection)
+    precomputeData();
+    visualization();
   } else {   
     // no need to change anything
     console.log("Selected mode: Relative (no change)");

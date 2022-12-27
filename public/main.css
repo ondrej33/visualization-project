@@ -74,7 +74,7 @@ body{
 }
 
 #state1_div{
-  width: 50%;
+  width: 55%;
   height: 90vh;
   float: left;
   padding-left: 5%;
@@ -100,20 +100,20 @@ body{
 }
 
 #state1_map_div{
-  width: 100%;
+  width: 90%;
   height: 50vh;
   float: left;
 }
 
 #state1_pie_chart_div{
-  width: 75%;
+  width: 70%;
   height: 30vh;
   float: left;
   padding-right: 3vh;
 }
 
 #states_attributes_menu_div{
-  width: 25%;
+  width: 30%;
   height: 30vh;
   float: left;
   padding-top: 2vh;
@@ -121,10 +121,10 @@ body{
 }
 
 #victim_div{
-  width: 40%;
+  width: 45%;
   height: 90vh;
   float: left;
-  padding-left: 12%;
+  padding-left: 6%;
 }
 
 #victim_upper{
@@ -167,7 +167,7 @@ body{
 }
 
 .subline{
-  font-size: 80%;
+  font-size: 90%;
   font-weight: thick;
 }
 
