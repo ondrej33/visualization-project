@@ -442,9 +442,12 @@ function drawTitle() {
 function drawVictimListDescriptions() {
   victimListDescriptionArea.append("text")
     .attrs({ dx: d3.select("#victim_upper").node().clientWidth / 10, dy: "1em", class: "description-font"})
-    .text("People shot in the selected area and time");
+    .text("List of people shot in selected");
   victimListDescriptionArea.append("text")
-    .attrs({ dx: d3.select("#victim_upper").node().clientWidth / 10, dy: "3em", opacity: 0.7})
+    .attrs({ dx: d3.select("#victim_upper").node().clientWidth / 10, dy: "2em", class: "description-font"})
+    .text("area during selected time");
+  victimListDescriptionArea.append("text")
+    .attrs({ dx: d3.select("#victim_upper").node().clientWidth / 10, dy: "4.5em", opacity: 0.7})
     .text("(up to 100 people displayed)");
 }
 
@@ -480,7 +483,7 @@ function drawUsMapStats() {
   usMapStatsArea.append('rect').attrs({ 
     x: 0, 
     y: usMapStatsArea.node().clientHeight - 30, 
-    width: usMapStatsArea.node().clientWidth * 0.8, 
+    width: usMapStatsArea.node().clientWidth * 0.6, 
     height: 18, 
     stroke: 'white',
     fill: 'url(#svgGradient)' //gradient color fill is set as url to svg gradient element
@@ -491,14 +494,23 @@ function drawUsMapStats() {
     .attrs({x: 0, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
     .text(0);
   usMapStatsArea.append("text")
-    .attrs({x: usMapStatsArea.node().clientWidth * 0.8, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
+    .attrs({x: usMapStatsArea.node().clientWidth * 0.6, y: usMapStatsArea.node().clientHeight - 32, class: "subline"})
     .attr("text-anchor", "end")
     .text(highestAbsVal);
+
+  // Description of displayed values
+  // TODO: change if relative view selected
+  usMapStatsArea.append("text")
+    .attrs({x: usMapStatsArea.node().clientWidth * 0.3, y: usMapStatsArea.node().clientHeight - 40, class: "subline"})
+    .attr("text-anchor", "middle")
+    .text("Number of people killed");
+
 
   // Compute and display some stats
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 40})
-    .text("STATS REGARDING NUMBERS OF CASES");
+    .text("Number of shootings across states")
+    .style("font-size", "140%");
 
   // compute min, sum, average and mid, ... values first
   var minValue = 1000000; // some large value
@@ -527,22 +539,22 @@ function drawUsMapStats() {
   // highest number of cases per state
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 90})
-    .text("Highest per state: " + highestAbsVal);
+    .text("Highest: " + highestAbsVal);
 
   // least number of cases per state
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 110})
-    .text("Lowest per state: " + minValue);
+    .text("Lowest: " + minValue);
 
   // average number of cases per state
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 130})
-    .text("Average per state: " + averageValue.toFixed(2));
+    .text("Average: " + averageValue.toFixed(2));
 
   // median number of cases per state
   usMapStatsArea.append("text")
     .attrs({x: 0, y: 150})
-    .text("Median per state: " + medianValue);
+    .text("Median: " + medianValue);
 
   // note for 2022 about missing data
   if (selectedYear == "2022") {
@@ -608,6 +620,17 @@ function drawSecondMap(state) {
     var state1Map = state1MapArea.append('g')
       .attr("id", "map-g")
       .attr("clip-path", "url(#clip)")
+    
+    // for small states, the stroke width must be made synthetically smaller because of scale problems
+    var strokeWidth = 1;
+    if (state == "DC") { 
+      strokeWidth = 0.05;
+    } else if (state == "DE" | state == "RI" | state == "CT" | state == "DE") { 
+      strokeWidth = 0.5;
+    } else if (state == "NH" | state == "NJ" | state == "VT" | state == "MA" | state == "HI" | state == "MD") {
+      scaler = 0.8;
+    }
+
 
     // Bind the data to the SVG and create one path per GeoJSON feature
     state1Map.selectAll("path")
@@ -619,7 +642,7 @@ function drawSecondMap(state) {
         .attr("idx", function(d) {return d.id})
         .attr("d", d3.geoPath().projection(projection)) // d3.geoPath() creates real path object from the coords
         .style("stroke", "#fff")
-        .style("stroke-width", "1")
+        .style("stroke-width", strokeWidth)
         .style("fill", function(d) { 
           var stateCode = dataStateNameMappingsReversed[d.properties.name];
           return myColorScale(dataByStatesRestricted[stateCode].length); 
@@ -651,10 +674,14 @@ function drawSecondMap(state) {
     
     // Map the cities, the size of each circle corresponds to the sqrt of number of its cases
 
-    // for DC, the circle size must be made synthetically smaller because of scale problems
-    var max_radius = 1000;
+    // for small states, the circle sizes must be made synthetically smaller because of scale problems
+    var scaler = 1;
     if (state == "DC") { 
-      max_radius = 0.5;
+      scaler = 10;
+    } else if (state == "DE" | state == "RI" | state == "CT" | state == "DE") { 
+      scaler = 2.5;
+    } else if (state == "NH" | state == "NJ" | state == "VT" | state == "MA" | state == "HI" | state == "MD") {
+      scaler = 1.8;
     }
     
     state1Map.selectAll("circle")
@@ -663,9 +690,9 @@ function drawSecondMap(state) {
       .append("circle")
         .attr("cx", function(d) { return projection([d.lon, d.lat])[0]; })
         .attr("cy", function(d) { return projection([d.lon, d.lat])[1]; })
-        .attr("r", function(d) { return Math.min(Math.log(d.val + 1), max_radius); })
+        .attr("r", function(d) { return Math.min(Math.log(d.val + 1) / scaler); })
         .style("fill", "rgb(0,0,0)")	
-        .style("opacity", 0.85)	
+        .style("opacity", 0.95)	
       .on("mouseover", function(d) { // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
         state1MapToolTip.transition()        
           .duration(100)      
@@ -821,7 +848,8 @@ function drawStateStats(state) {
   // Compute and display some stats
   state1StatsArea.append("text")
     .attrs({x: 0, y: 20})
-    .text("INFO REGARDING THE STATE");
+    .text("Info regarding the state")
+    .style("font-size", "120%");
 
   // compute some numbers first
   var casesState = dataByStatesRestricted[state];
@@ -851,7 +879,7 @@ function drawStateStats(state) {
   }
   state1StatsArea.append("text")
     .attrs({x: 0, y: 70})
-    .text("Rank: " + rankStateAbs + sameNumCasesString);
+    .text("State rank: " + rankStateAbs + sameNumCasesString);
 }
 
 
@@ -951,6 +979,11 @@ async function drawVictimList() {
   victimList.text("");
   var i = 0;
   for (shootingCase in data) {
+    // check if record has a name attribute
+    if (data[shootingCase].name == "") {
+      continue;
+    }
+    // check if limit number of displayed names was reached
     if (i == 100) {
       break;
     }
