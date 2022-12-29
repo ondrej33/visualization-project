@@ -7,44 +7,44 @@ body{
 
 #main_div{
   width: 100%;
-  height: 80vh;
+  height: 82vh;
   float: left;
-  background:#e0eaff;
+  background:#dfe8fb;
 }
 
 #main_upper_div{
   width: 100%;
-  height: 10vh;
+  height: 12vh;
 }
 
 #title_div{
   width: 50%;
-  height: 10vh;
+  height: 12vh;
   float: left;
 }
 
 #us_map_options_div{
   width: 50%;
-  height: 10vh;
+  height: 12vh;
   float: left;
   margin-top: 4vh;
 }
 
 #abs_rel_div{
   width: 50%;
-  height: 10vh;
+  height: 12vh;
   float: left;
 }
 
 #choose_year_div{
   width: 25%;
-  height: 10vh;
+  height: 12vh;
   float: left;
 }
 
 #choose_month_div{
   width: 25%;
-  height: 10vh;
+  height: 12vh;
   float: left;
 }
 
@@ -70,7 +70,7 @@ body{
   width: 100%;
   height: 90vh;
   float: left;
-  background:#e0eaff;
+  background:#dfe8fb;
 }
 
 #state1_div{
@@ -106,14 +106,14 @@ body{
 }
 
 #state1_pie_chart_div{
-  width: 70%;
+  width: 65%;
   height: 30vh;
   float: left;
   padding-right: 3vh;
 }
 
 #states_attributes_menu_div{
-  width: 30%;
+  width: 35%;
   height: 30vh;
   float: left;
   padding-top: 2vh;
@@ -144,10 +144,10 @@ body{
 
 #victim_list{
   width: 100%;
-  height: 60vh;
+  height: 75vh;
   margin: auto;
   float: left;
-  background:#e0eaff;
+  background:#dfe8fb;
 }
 
 .headline, .subline, .description-font{

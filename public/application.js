@@ -304,8 +304,8 @@ function init() {
     .attr("height", d3.select("#state1_stats_div").node().clientHeight)
 
   // zoom state1 chart
-  // use "translate" to make the central point 1/3 from left and 1/2 from bottom
-  var centerWidth = d3.select("#state1_pie_chart_div").node().clientWidth / 3;
+  // use "translate" to make the central point 5/12 from left and 1/2 from bottom
+  var centerWidth = d3.select("#state1_pie_chart_div").node().clientWidth * 5 / 12;
   var centerHeight = d3.select("#state1_pie_chart_div").node().clientHeight / 2;
   state1ChartArea = d3.select("#state1_pie_chart_div")
     .append("svg")
@@ -452,7 +452,7 @@ function computeHighestValues() {
 BEGINNING OF VISUALIZATION
 ----------------------*/
 function visualization() {
-  drawUsMapStats();
+  drawUsMapStatsAndDescription();
   colorMap();
   drawPieChart(selectedAttribute, selectedState);
   drawStateStats(selectedState);
@@ -468,6 +468,10 @@ function drawTitle() {
   titleArea.append("text")
     .attrs({ dx: d3.select("#title_div").node().clientWidth / 10, dy: "2em", class: "headline" })
     .text("Police Shootings in the US");
+  titleArea.append("text")
+    .attrs({ dx: d3.select("#title_div").node().clientWidth / 10, dy: "5.5em"})
+    .text("since 2016")
+    .style("opacity", "0.7");
 }
 
 function drawVictimListDescriptions() {
@@ -485,9 +489,11 @@ function drawVictimListDescriptions() {
 /*----------------------
 STATS AND LEGEND FOR THE MAIN MAP
 ----------------------*/
-function drawUsMapStats() {
+function drawUsMapStatsAndDescription() {
   // remove existing stuff
   usMapStatsArea.text("")
+
+  // 1) Add the gradient + color legend at the bottom
 
   // set up a gradient variable for linear gradient
   // this is a storage elemnt that is appended as separate xml tag to svg, but does not result any "graphical output"
@@ -544,7 +550,7 @@ function drawUsMapStats() {
     usMapStatsArea.append("text")
       .attrs({x: usMapStatsArea.node().clientWidth * 0.35, y: usMapStatsArea.node().clientHeight - 40, class: "subline"})
       .attr("text-anchor", "middle")
-      .text("Number of people killed");
+      .text("Number of people shot");
   } else {
     usMapStatsArea.append("text")
       .attrs({x: usMapStatsArea.node().clientWidth * 0.7, y: usMapStatsArea.node().clientHeight - 36, class: "subline"})
@@ -553,12 +559,32 @@ function drawUsMapStats() {
     usMapStatsArea.append("text")
       .attrs({x: usMapStatsArea.node().clientWidth * 0.35, y: usMapStatsArea.node().clientHeight - 40, class: "subline"})
       .attr("text-anchor", "middle")
-      .text("Number of killed per million people");
+      .text("Number of people shot per 1 million");
   }
 
-  // Compute and display some stats
+  // 2) Add some overall description of interactions
+  usMapStatsArea.append("text")
+    .attrs({x: 0, y: 20})
+    .text("Some available interactions:")
+    .style("font-size", "140%");
+  
+  usMapStatsArea.append("text")
+    .attrs({x: 10, y: 50})
+    .text("- select a time period (menus above)")
+  usMapStatsArea.append("text")
+    .attrs({x: 10, y: 70})
+    .text("- select a view mode (absolute/relative)")
+  usMapStatsArea.append("text")
+    .attrs({x: 10, y: 90})
+    .text("- select a state (via map click or menu)")
+  usMapStatsArea.append("text")
+    .attrs({x: 10, y: 110})
+    .text("- then select an attribute to display")
 
-  // description heading
+
+  // 3) Compute and display some stats
+
+  // heading
   textToAdd = "";
   if (selectedMode == "Abs") {
     textToAdd = "Number of shootings across states";
@@ -566,7 +592,7 @@ function drawUsMapStats() {
     textToAdd = "Number of shootings per million people"
   }
   usMapStatsArea.append("text")
-    .attrs({x: 0, y: 40})
+    .attrs({x: 0, y: 170})
     .text(textToAdd)
     .style("font-size", "140%");
 
@@ -611,59 +637,59 @@ function drawUsMapStats() {
   if (selectedMode == "Abs") {
     // total number of cases
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 70})
+      .attrs({x: 10, y: 200})
       .text("Total: " + sumValue);
   
     // highest number of cases per state
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 90})
+      .attrs({x: 10, y: 220})
       .text("Highest: " + highestAbsVal);
 
     // least number of cases per state
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 110})
+      .attrs({x: 10, y: 240})
       .text("Lowest: " + minValue);
 
     // median number of cases per state
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 130})
+      .attrs({x: 10, y: 260})
       .text("Median: " + medianValue);
 
     // average number of cases per state
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 150})
+      .attrs({x: 10, y: 280})
       .text("Average: " + averageValue.toFixed(2));
 
   } else {
     // overall relative number of cases
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 70})
+      .attrs({x: 10, y: 200})
       .text("Over whole US: " + (sumValue / totalPopulation * 1_000_000).toFixed(2));
   
     // highest number of cases per state
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 90})
+      .attrs({x: 10, y: 220})
       .text("Highest: " + highestRelVal.toFixed(2));
 
     // least number of cases per state
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 110})
+      .attrs({x: 10, y: 240})
       .text("Lowest: " + minRelValue.toFixed(2));
 
     // median number of cases per state
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 130})
+      .attrs({x: 10, y: 260})
       .text("Median: " + medianRelValue.toFixed(2));
   }
 
   // note for 2022 about missing data
   if (selectedYear == "2022") {
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 190})
+      .attrs({x: 0, y: 330})
       .style("fill", "red")
       .text("For 2022, data are incomplete.");
     usMapStatsArea.append("text")
-      .attrs({x: 0, y: 210})
+      .attrs({x: 0, y: 350})
       .style("fill", "red")
       .text("Data regarding Oct-Dec are missing.");
   }
@@ -818,7 +844,7 @@ function drawSecondMap(state) {
           cityName = d.name
           stateCode = dataStateNameMappingsReversed[listSelectedStateOnly[0].properties.name];
           dataCity = dataByStatesRestricted[stateCode].filter(shootingCase => shootingCase.city == cityName);
-          return cityName + ": " + dataCity.length;
+          return cityName + ": " + dataCity.length + " cases";
         })
           .style("font-size", "115%")
           .style("color", "black")
