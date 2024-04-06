@@ -742,7 +742,7 @@ function drawSecondMap(state) {
   $("#select_attrib_menu").addClass("show");
           
   // Load GeoJSON data and merge with states data
-  d3.json("us-states.json", function(json) { 
+  d3.json("./public/us-states.json", function(json) { 
     var listSelectedStateOnly = json.features.filter((d) => (dataStateNameMappingsReversed[d.properties.name] === state))
 
     var projection = d3.geoAlbersUsa()
